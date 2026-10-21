@@ -5,13 +5,14 @@
 import { $, el } from '../shared/app.js';
 import { assetMeta, assetByTicker, fmtAtoms, usdFor, priceUsd, assetSupervised, supervisionNote } from '../shared/meta.js';
 import { markets, MOUNTS } from '../shared/book.js';
-import { pairsOf, mergeBook, remaindersOf, seriesOf, priceAtoms, amountAtoms, estimate } from '../shared/market-book.js';
+import { pairsOf, mergeBook, remaindersOf, seriesOf, priceAtoms, amountAtoms, estimate, marketPrice, PRICE_WORDS } from '../shared/market-book.js';
 import * as P from '../shared/provider.js';
 
 const BOOK_POLL_MS = 15_000;
 const ORDERS_POLL_MS = 10_000;
 const PAIRS_POLL_MS = 60_000;
 const DEPTH_ROWS = 10;
+const LIST_PRICE_MAX_AGE_MS = 5 * 60_000;
 
 const tk = (h) => (h === 'BTC' ? 'BTC' : assetMeta(h).ticker);
 const prec = (h) => (h === 'BTC' ? 8 : (assetMeta(h).precision ?? 8));
@@ -57,6 +58,8 @@ async function relayList(mount, base, quote, what) {
 export async function runMarketPage() {
   let pairs = [], current = null, book = null, side = 'buy', type = 'market';
   let busy = false, picked = false;
+  // Each market's one price (marketPrice), shared by its list entry and its header.
+  const prices = new Map();   // key -> { price, kind, at } | null, with `fetched`
   const ordersNote = $('ordersNote');
 
   // ---- pairs ----
@@ -100,6 +103,7 @@ export async function runMarketPage() {
     }
     pairs = list.length ? list : pairs;
     renderPairs();
+    fillListPrices();
     const linked = pairs.find((p) => want.length === 2 && (tk(p.base) + '-' + tk(p.quote)).toLowerCase() === want.join('-').toLowerCase());
     // The pair a link names, once it is known (a held asset's pair appears after the
     // wallet connects), unless the user has picked one since.
@@ -116,8 +120,10 @@ export async function runMarketPage() {
       if (assetSupervised(p.base) || assetSupervised(p.quote)) {
         const s = el('span', 'sup', '⊘'); s.title = supervisionNote(assetSupervised(p.base) ? p.base : p.quote); b.appendChild(s);
       }
-      const pu = priceUsd(p.base);
-      if (pu > 0) b.appendChild(el('span', 'n', usd(pu)));
+      const n = el('span', 'n', listPriceText(p));
+      const mp = prices.get(p.key);
+      if (mp && mp.price != null) n.title = PRICE_WORDS[mp.kind];
+      b.appendChild(n);
       const on = current && current.key === p.key;
       b.classList.toggle('on', !!on);
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -125,6 +131,35 @@ export async function runMarketPage() {
       box.appendChild(b);
     }
   }
+  function listPriceText(p) {
+    const mp = prices.get(p.key);
+    return mp && mp.price != null ? priceText(mp.price, p.quote) : '';
+  }
+  function notePrice(p, mp) {
+    prices.set(p.key, { ...(mp || { price: null }), fetched: Date.now() });
+    const b = document.querySelector(`#pairList button.mkt[data-key="${p.key}"] .n`);
+    if (b) { b.textContent = listPriceText(p); b.title = mp ? PRICE_WORDS[mp.kind] : ''; }
+  }
+  // The list's prices, read market by market (a few at a time) and kept a few minutes;
+  // the market on screen keeps its own fresh with every refresh of its book.
+  let filling = false;
+  async function fillListPrices() {
+    if (filling) return;
+    filling = true;
+    try {
+      const due = pairs.filter((p) => { const c = prices.get(p.key); return !c || Date.now() - c.fetched > LIST_PRICE_MAX_AGE_MS; });
+      let next = 0;
+      const worker = async () => {
+        for (;;) {
+          const p = due[next++];
+          if (!p) return;
+          try { const m = await loadMarket(p); notePrice(p, marketPrice(m.book, m.series)); } catch { /* left blank */ }
+        }
+      };
+      await Promise.all([worker(), worker(), worker()]);
+    } finally { filling = false; }
+  }
+
   function select(p) {
     if (!p) return;
     current = p; book = null;
@@ -133,15 +168,15 @@ export async function runMarketPage() {
     const u = new URL(location.href); u.searchParams.set('pair', tk(p.base) + '-' + tk(p.quote)); history.replaceState(null, '', u);
     $('bookBody').textContent = '';
     $('lastPrice').textContent = '';
+    $('priceKind').textContent = '';
     renderForm();
     refreshBook();
     renderBalances();
   }
 
   // ---- book and chart ----
-  async function refreshBook() {
-    if (!current) return;
-    const p = current;
+  // One market's merged book and its trades, as the chart plots them.
+  async function loadMarket(p) {
     const opts = { base: p.base, quote: p.quote, basePrec: prec(p.base), quotePrec: prec(p.quote) };
     let offers = [], trades = [], reversed = [];
     if (p.quote === 'BTC') {
@@ -155,10 +190,20 @@ export async function runMarketPage() {
       ]);
       offers = [...ab, ...ba]; opts.remainders = remaindersOf([...fab, ...fba]); trades = tab; reversed = tba;
     }
+    return { book: mergeBook(offers, opts), series: seriesOf({ trades, reversed, basePrec: opts.basePrec, quotePrec: opts.quotePrec }) };
+  }
+  async function refreshBook() {
+    if (!current) return;
+    const p = current;
+    const m = await loadMarket(p);
     if (current !== p) return;
-    book = mergeBook(offers, opts);
+    book = m.book;
     renderBook();
-    renderChart(seriesOf({ trades, reversed, basePrec: opts.basePrec, quotePrec: opts.quotePrec }));
+    const mp = marketPrice(m.book, m.series);
+    notePrice(p, mp);
+    $('lastPrice').textContent = mp ? priceText(mp.price, p.quote) : '';
+    $('priceKind').textContent = mp ? PRICE_WORDS[mp.kind] : 'no orders or trades yet';
+    renderChart(m.series);
     paintEstimate();
   }
   function renderBook() {
@@ -183,8 +228,6 @@ export async function runMarketPage() {
     const td = el('td', null, asks.length && bids.length ? 'spread ' + priceText(asks[0].price - bids[0].price, p.quote) : !asks.length && !bids.length ? 'No orders on this market right now.' : asks.length ? 'Only sellers right now' : 'Only buyers right now');
     td.colSpan = 3; mid.appendChild(td); body.appendChild(mid);
     for (const l of bids) body.appendChild(row(l, 'bid'));
-    const best = book.best.ask != null && book.best.bid != null ? (book.best.ask + book.best.bid) / 2 : (book.best.ask ?? book.best.bid);
-    $('lastPrice').textContent = best != null ? priceText(best, p.quote) : '';
   }
   function renderChart(pts) {
     const svg = $('chart');

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { orient, pairsOf, mergeBook, rowOf, remaindersOf, seriesOf, priceAtoms, amountAtoms, estimate } from '../shared/market-book.js';
+import { orient, pairsOf, mergeBook, rowOf, remaindersOf, seriesOf, priceAtoms, amountAtoms, estimate, marketPrice, PRICE_WORDS } from '../shared/market-book.js';
 
 const G = 'aa'.repeat(32), U = 'bb'.repeat(32), S = 'cc'.repeat(32);
 const price = { [G]: 4146, [U]: 1, [S]: 0.37 };
@@ -82,4 +82,14 @@ test('the form\'s estimate walks the levels from the best', () => {
   assert.deepEqual(estimate(book, 'buy', 150n), { base: 150n, quote: 414600n + 210000n, short: false });
   assert.equal(estimate(book, 'buy', 500n).short, true);
   assert.equal(estimate(book, 'sell', 1n).short, true);
+});
+
+test('a market shows one price: the middle of the book, else the last trade, else none', () => {
+  const both = { best: { ask: 91.55, bid: 90.65 } }, oneSide = { best: { ask: 91.55, bid: null } }, empty = { best: { ask: null, bid: null } };
+  const series = [{ t: 1, price: 97.53 }, { t: 2, price: 92 }];
+  assert.deepEqual(marketPrice(both, series), { price: 91.1, kind: 'mid' });
+  assert.deepEqual(marketPrice(oneSide, series), { price: 92, kind: 'last', at: 2 });
+  assert.equal(marketPrice(empty, []), null);
+  assert.equal(marketPrice(oneSide, []), null);
+  assert.equal(PRICE_WORDS.mid, 'middle of the book');
 });

@@ -17,12 +17,13 @@
   <div class="market-grid">
     <div class="panel">
       <h2>Markets</h2>
+      <p class="faint price-note">Each price is the middle of the book; where the book lacks buyers or sellers, it is the last trade.</p>
       <div id="pairList"><p class="sub">Loading…</p></div>
     </div>
 
     <div class="market-main">
       <div class="panel">
-        <div class="mkt-head"><h2 id="pairTitle">Market</h2><span id="lastPrice" class="mono"></span></div>
+        <div class="mkt-head"><h2 id="pairTitle">Market</h2><span class="price-box"><span id="lastPrice" class="mono"></span><span id="priceKind" class="faint"></span></span></div>
         <svg id="chart" class="chart" viewBox="0 0 600 160" preserveAspectRatio="none" role="img" aria-label="Price of recent trades"></svg>
         <p id="chartNote" class="faint"></p>
       </div>

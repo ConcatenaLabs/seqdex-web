@@ -127,6 +127,21 @@ export function seriesOf({ trades = [], reversed = [], basePrec, quotePrec }) {
   return pts.sort((a, b) => a.t - b.t);
 }
 
+// The one price a market shows, in its list entry and in its header alike: the middle
+// of the book while it has buyers and sellers; otherwise the last trade; otherwise none
+// (a reference price that no order or trade backs is never shown as the market's).
+// `kind` names it in plain words: 'mid' (the middle of the book) or 'last' (the last
+// trade). `series` is seriesOf's points, oldest first.
+export function marketPrice(book, series) {
+  if (book && book.best && book.best.ask != null && book.best.bid != null) {
+    return { price: (book.best.ask + book.best.bid) / 2, kind: 'mid' };
+  }
+  const last = (series || []).at(-1);
+  if (last && last.price > 0) return { price: last.price, kind: 'last', at: last.t };
+  return null;
+}
+export const PRICE_WORDS = { mid: 'middle of the book', last: 'last trade' };
+
 // A price typed by the user, in quote units per base unit, as quote atoms per whole base
 // unit (the wallet's `price`). Digits and one point only.
 export function priceAtoms(str, quotePrec) {

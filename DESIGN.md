@@ -33,6 +33,11 @@ browser).
   a covenant order at the amount it was signed with; the book reads what the order
   holds from the relay's fill records (the order rests again at the fill's output
   2k+1). Levels are grouped by price, with their running depth.
+- **The market's price.** One price per market, the same in its list entry and in
+  its header (`marketPrice`): the middle of the book while it has buyers and sellers;
+  otherwise the last trade; otherwise none. The header names which in plain words, and
+  the list says it once above the markets. An asset's reference price alone is never
+  shown as a market's price.
 - **Values.** Prices and totals in the reference currency (the price server's
   numbers), amounts in the asset's own units. The chart plots the pair's trades
   (both orientations) valued at today's price of the quote.
