@@ -9,7 +9,7 @@
   --bg: #0b0c0f; --panel: #14161c; --panel2: #191c24; --line: #262b35;
   --txt: #e9ecf1; --dim: #97a0ae; --faint: #5c6470;
   --gold: #ffc629; --violet: #9d7bff; --teal: #2dd4bf;
-  --green: #3ddc84; --red: #ff6b7a;
+  --green: #3ddc84; --red: #ff6b7a; --lime: #a3e635;
   --accent: var(--gold);
   --disp: 'Space Grotesk', system-ui, sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
@@ -17,6 +17,7 @@
 .surface-ln   { --accent: var(--violet); }
 .surface-chain{ --accent: var(--gold); }
 .surface-conf { --accent: var(--teal); }
+.surface-leaf { --accent: var(--lime); }
 
 * { box-sizing: border-box; margin: 0; }
 html { scrollbar-color: var(--line) var(--bg); }
@@ -64,6 +65,7 @@ button { font-family: var(--disp); cursor: pointer; }
 .nav a[data-s="ln"]   { --nav-accent: var(--violet); }
 .nav a[data-s="chain"]{ --nav-accent: var(--gold); }
 .nav a[data-s="conf"] { --nav-accent: var(--teal); }
+.nav a[data-s="leaf"] { --nav-accent: var(--lime); }
 .spacer { flex: 1; }
 
 .connect-btn {
@@ -197,6 +199,7 @@ label.lbl { display: block; margin-top: 12px; font-size: 12px; color: var(--dim)
 .tile-chain{ --t-acc: var(--gold); }
 .tile-conf { --t-acc: var(--teal); }
 .tile-chan { --t-acc: var(--violet); }
+.tile-leaf { --t-acc: var(--lime); }
 
 .hero { margin: 44px 0 8px; max-width: 640px; }
 .hero h1 { font-size: 40px; line-height: 1.12; letter-spacing: -.015em; }
@@ -213,3 +216,29 @@ label.lbl { display: block; margin-top: 12px; font-size: 12px; color: var(--dim)
   .tile { transition: none; }
   .tile:hover { transform: none; }
 }
+
+/* The leaves room (developer mode). */
+.room-grid { display: grid; grid-template-columns: 1fr 340px; gap: 16px; align-items: start; }
+.room-grid > div { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.room-panel { min-width: 0; }
+.room-panel .wrow .amt { white-space: nowrap; }
+#pOperator .wrow .amt { white-space: normal; text-align: right; }
+.room-panel .wrow .amt.mono { white-space: normal; overflow-wrap: anywhere; text-align: right; min-width: 0; }
+@media (max-width: 960px) { .room-grid { grid-template-columns: 1fr; } }
+.leaf-book { table-layout: fixed; }
+table.leaf-book td { font-size: 12.5px; vertical-align: top; white-space: normal; overflow-wrap: anywhere; text-align: left; }
+table.leaf-book th { text-align: left; }
+table.leaf-book tr.why td { text-align: left; }
+.leaf-book .take-amt { width: 100%; max-width: 130px; margin: 0 4px 4px 0; }
+.leaf-book { width: 100%; }
+.leaf-book tr.why td { padding-top: 0; font-size: 12px; border-top: 0; }
+.pill.muted { border-color: var(--faint); color: var(--dim); font-weight: 500; }
+.take { border-top: 1px solid var(--line); padding: 8px 0; }
+.take:first-of-type { border-top: 0; }
+.take .sub { font-size: 12.5px; }
+.take .sub2 { font-size: 11px; overflow-wrap: anywhere; }
+.pill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--accent); color: var(--accent); white-space: nowrap; }
+.take-final .pill { border-color: var(--green); color: var(--green); }
+.take-undone .pill, .take-void .pill { border-color: var(--red); color: var(--red); }
+.field { display: grid; gap: 4px; margin: 0 0 10px; }
+.field input, .field select, .leaf-book input { background: var(--panel2); color: var(--txt); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 13px; }

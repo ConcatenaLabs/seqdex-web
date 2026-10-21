@@ -47,6 +47,15 @@ export async function initChrome(active) {
   }
   bar.appendChild(nav);
   bar.appendChild(el('span', 'spacer'));
+  // The leaves room is a developer-mode room: its link is drawn only while the wallet
+  // says it is in developer mode, and goes when it says otherwise.
+  const devLink = el('a', null, 'Leaves');
+  devLink.href = 'leaves.html'; devLink.dataset.s = 'leaf'; devLink.id = 'navLeaves';
+  if (here === 'leaves.html' || active === 'leaves.html') devLink.classList.add('on');
+  const showDev = (mode) => {
+    if (mode === 'developer') { if (!devLink.isConnected) nav.appendChild(devLink); }
+    else devLink.remove();
+  };
 
   const btn = el('button', 'connect-btn');
   btn.id = 'btnConnect';
@@ -91,6 +100,8 @@ export async function initChrome(active) {
     renderConnect(btn, P.account(), true);
     P.watchEvents();
     restored = P.restore();
+    P.walletMode().then(showDev).catch(() => {});
+    P.onEvent('modeChanged', (d) => showDev(d && d.mode));
   });
 
   // When the provider is already there, onProvider has fired synchronously and

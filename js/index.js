@@ -5,6 +5,27 @@ import * as P from '../shared/provider.js';
 const acc = await initChrome('index.html');
 footer();
 
+// The leaves room is a developer-mode room: its tile is drawn only while the wallet
+// says it is in developer mode.
+function leafTile(mode) {
+  const have = document.getElementById('tileLeaves');
+  if (mode !== 'developer') { if (have) have.remove(); return; }
+  if (have) return;
+  const a = el('a', 'tile tile-leaf');
+  a.id = 'tileLeaves';
+  a.href = 'leaves.html';
+  const h = el('h3');
+  h.appendChild(el('small', null, 'Developer mode · leaves'));
+  h.appendChild(document.createTextNode('Leaves room'));
+  a.appendChild(h);
+  a.appendChild(el('p', null, 'Fill on-chain orders from your leaves through your operator\u2019s round, and place orders on the chain from them. Shown because your wallet is in developer mode.'));
+  document.querySelector('.tiles').appendChild(a);
+}
+P.onProvider(() => {
+  P.walletMode().then(leafTile).catch(() => {});
+  P.onEvent('modeChanged', (d) => leafTile(d && d.mode));
+});
+
 // A tile's live line is built from nodes, never from markup: the numbers come
 // from the relay and the wallet, and nothing fetched is ever concatenated
 // into HTML. Pass strings for plain text and [n] for a highlighted number.

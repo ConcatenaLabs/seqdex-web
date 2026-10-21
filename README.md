@@ -16,6 +16,10 @@ a channel marketplace:
 - **Channel marketplace**: per-asset channel state and inbound liquidity
   for LNDEX traders.
 
+A wallet in developer mode also sees the leaves room: on-chain orders filled
+from leaves held in an operator's tree, and orders placed on the chain from
+them (DESIGN.md, "Leaves room").
+
 The web wallet ([`sequentia-web-wallet`](https://github.com/ConcatenaLabs/sequentia-web-wallet))
 carries the unified trading terminal; this site is the split-surface
 alternative that reads the same relays.
@@ -25,6 +29,8 @@ Wallet protocol: [`sequentia-extension/doc/PROVIDER.md`](https://github.com/Conc
 
 Static ES modules, no bundler, no framework. Serve the directory as-is;
 deployed behind Caddy at `/dex/` on the testnet box.
+
+Tests: `node --test`.
 
 Run it locally: `python3 -m http.server 8080` in this directory and open
 http://localhost:8080/index.html. Books, the asset registry and prices are
