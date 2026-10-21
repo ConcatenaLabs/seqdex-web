@@ -88,6 +88,13 @@ export function fmtPrice(p) {
   return p.toFixed(8).replace(/0+$/, '').replace(/\.$/, '');
 }
 
+// The price of one whole unit of an asset in the reference currency, or null.
+export function priceUsd(hex) {
+  const t = hex === 'BTC' ? 'BTC' : (hex === POLICY_HEX ? 'SEQ' : assetMeta(hex).ticker);
+  const p = PRICES[String(t).toUpperCase()] || (t === 'BTC' ? PRICES.TBTC : null);
+  return p > 0 ? p : null;
+}
+
 export function usdFor(hex, atoms) {
   const t = hex === 'BTC' ? 'BTC' : (hex === POLICY_HEX ? 'SEQ' : assetMeta(hex).ticker);
   const p = PRICES[String(t).toUpperCase()] || (t === 'BTC' ? PRICES.TBTC : null);

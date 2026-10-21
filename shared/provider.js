@@ -114,6 +114,13 @@ export async function walletMode() {
   try { return (await request('getWalletMode')).mode || null; } catch { return null; }
 }
 
+// Whether the wallet serves a method (its getCapabilities list): an older wallet is told
+// to update rather than met with an unknown-method error.
+export async function supports(method) {
+  try { const caps = await assertGenuine(); return Array.isArray(caps.methods) && caps.methods.includes(method); }
+  catch { return false; }
+}
+
 // ---- typed helpers over the raw protocol (only what the site calls) ----
 export const getBalances = () => request('getBalances');
 export const lnChannels = () => request('lnChannels');

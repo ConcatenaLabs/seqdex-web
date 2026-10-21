@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="shared/sequentia-mark.svg">
+<title>Rooms · SeqDEX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/tokens.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar"></header>
+
+  <section class="hero">
+    <h1>Three exchanges.<br>One wallet. <span class="g">No custody.</span></h1>
+    <p>SeqDEX trades against the Sequentia browser extension wallet: your keys stay in the
+    extension, every order and every settlement is signed on your side. Each exchange below is
+    its own room with its own book and its own settlement rules. Pick by how you want to settle.</p>
+    <p class="req">Trading needs the <b>Sequentia wallet extension</b>. Get it from the
+    <a href="https://sequentiatestnet.com/download/" target="_blank" rel="noopener">downloads page</a>,
+    install it in a Chromium browser, then connect. Your keys never leave the extension.</p>
+  </section>
+
+  <div class="tiles">
+    <a class="tile tile-ln" href="lndex.html">
+      <h3><small>Lightning · instant · final</small>LNDEX</h3>
+      <p>Pure Lightning swaps: both legs of every trade travel through Lightning channels,
+      yours and the maker's. Nothing touches the chain, so a settled trade is instant and
+      final. Trades Sequentia assets against each other and against BTC.</p>
+      <div class="live" id="liveLn">…</div>
+    </a>
+    <a class="tile tile-chain" href="onchain.html">
+      <h3><small>On-chain · atomic · Bitcoin-anchored</small>On-chain DEX</h3>
+      <p>Atomic on-chain settlement on Sequentia, cross-chain BTC through on-chain contracts,
+      and OpenAMP restricted assets. Funded covenant orders rest on the chain itself, so a
+      maker can go offline and the order still fills.</p>
+      <div class="live" id="liveChain">…</div>
+    </a>
+    <a class="tile tile-conf" href="confidential.html">
+      <h3><small>Blinded · Sequentia only</small>Confidential DEX</h3>
+      <p>Trades settle in blinded transactions: amounts and assets are hidden on-chain.
+      Sequentia assets only; Bitcoin has no confidential transactions, so there is no BTC
+      leg in this room by construction.</p>
+      <div class="live" id="liveConf">…</div>
+    </a>
+    <a class="tile tile-chan" href="channels.html">
+      <h3><small>Liquidity for the LNDEX</small>Channel marketplace</h3>
+      <p>Receiving over Lightning needs inbound capacity. See your per-asset channel state
+      and buy inbound liquidity here before you trade on the LNDEX.</p>
+      <div class="live" id="liveChan">…</div>
+    </a>
+  </div>
+</div>
+<script type="module" src="js/rooms.js"></script>
+</body>
+</html>
