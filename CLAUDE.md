@@ -53,10 +53,13 @@ the leaves room; both serve this checkout as the site.
 
 ## Deploy
 
-Box clone `/srv/seqdex-web` (must live outside /root: Caddy's file_server runs as the caddy user and cannot traverse /root); Caddy serves it via `handle_path
-/dex/*` + `file_server` (Caddyfile on the box, backup before editing,
-`caddy validate` + `systemctl reload caddy`). Flow: commit → push →
-`git pull` on the box. Nothing to build.
+Box clone `/srv/seqdex-web` (must live outside /root: Caddy's file_server runs as
+the caddy user and cannot traverse /root); Caddy serves it via `handle_path
+/dex/*` + `file_server`. The Caddyfile belongs to `sequentia-testnet-ops`: change
+it there by pull request, and install it on the box only with that repository's
+`bin/apply-caddy.sh`, never by editing it in place. Flow: commit → push → on the
+box, fetch and check out the commit in `/srv/seqdex-web`, readable to the caddy
+user. Nothing to build.
 
 ## Endpoints consumed
 
