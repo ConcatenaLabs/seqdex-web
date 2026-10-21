@@ -2,7 +2,7 @@ import { initChrome, footer, $, el } from '../shared/app.js';
 import { markets, pureLnMarkets } from '../shared/book.js';
 import * as P from '../shared/provider.js';
 
-const acc = await initChrome('index.html');
+const acc = await initChrome('rooms.html');
 footer();
 
 // The leaves room is a developer-mode room: its tile is drawn only while the wallet

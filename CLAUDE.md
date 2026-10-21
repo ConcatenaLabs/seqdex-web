@@ -5,11 +5,25 @@ contract (surfaces, books, settlement phases, provider dependencies).
 
 ## Rules
 
-- **No unified order book.** The surfaces are separate rooms by product
-  decision: LNDEX (`/seqob-pln`, `lightning.ln_direction` 2 or 3 only),
-  on-chain (`/seqob`), confidential (`/seqob-conf`, `pair.confidential == true`
-  only), and the developer-mode leaves room (`/seqob` covenant orders filled
-  and placed from leaves). Do not merge them.
+- **Two views.** The default view (`index.html`) is one market per pair, its book
+  merged from the orders the wallet settles in one step only: covenant orders on
+  `/seqob` read both ways round (a reversed market's order is a bid), and, against
+  BTC, the pure-Lightning quotes on `/seqob-pln` (`ln_direction` 2 or 3). Trades go
+  through the wallet's rail-blind `placeOrder`, `getOrders` and `cancelOrder`; the
+  page names no rail, room, operator, covenant or atom, and shows prices and totals
+  in the reference currency. The developer view keeps the rooms separate and
+  unmerged: LNDEX (`/seqob-pln`, `lightning.ln_direction` 2 or 3 only), on-chain
+  (`/seqob`), confidential (`/seqob-conf`, `pair.confidential == true` only), and
+  the developer-mode leaves room. Never merge the rooms, and never let a rail word
+  onto the default view (`test/market/drive.mjs` in the extension repository
+  checks the page's words).
+- **The view follows the wallet's mode** (`getWalletMode`, `modeChanged`), with the
+  site's override `?view=developer|default|wallet` (`shared/app.js`). The rooms'
+  links are drawn only in the developer view, by script.
+- **A fill is shown settled only when the relay calls it final** (`/fills`, state
+  `final`); until then it reads "Sent". After a partial fill the relay keeps listing
+  a covenant order at the amount it was signed with: the book reads what it holds
+  from the fill records (`remaindersOf`), the wallet from the chain.
 - **The leaves room exists only in developer mode.** It is drawn only while the
   wallet answers `getWalletMode` with `developer`; its navigation link and index
   tile are added by script then, never written into a page. Its copy speaks of
@@ -23,16 +37,19 @@ contract (surfaces, books, settlement phases, provider dependencies).
   offers (4/5) are the web wallet's business, never shown here.
 - Confidential DEX never gets a BTC leg (Bitcoin has no CT).
 - Static ES modules, no bundler. Surface accents are informational
-  (violet LN, gold chain, teal confidential); keep them consistent.
+  (violet LN, gold chain, teal confidential, lime leaves); the default view
+  settles every way at once and wears a neutral blue. Keep them consistent.
 - Public copy: no em dashes; "Sequentia" is never abbreviated to SEQ; the
   token is "the Sequence token (SEQ)".
 
 ## Tests
 
-`node --test` runs `test/*.test.mjs`: the leaves room's reading of the relay's
-book and fill records (`shared/leaf-room.js`). The room end to end, with the
-extension, an operator and a relay on a private chain, is the extension's
-`test/leaf-room/drive.mjs`, which serves this checkout as the site.
+`node --test` runs `test/*.test.mjs`: the default view's market (pair orientation,
+the merged book, the chart's series, typed amounts; `shared/market-book.js`) and the
+leaves room's reading of the relay's book and fill records (`shared/leaf-room.js`).
+End to end, each with the extension and a relay on a private chain, the extension's
+`test/market/drive.mjs` drives the default view and its `test/leaf-room/drive.mjs`
+the leaves room; both serve this checkout as the site.
 
 ## Deploy
 
@@ -45,10 +62,12 @@ Box clone `/srv/seqdex-web` (must live outside /root: Caddy's file_server runs a
 
 Same-origin under sequentiatestnet.com: `/registry/index.minimal.json`,
 `/prices`, the `/seqob`, `/seqob-pln` and `/seqob-conf` relay mounts (the
-leaves room also reads `/seqob`'s `/v1/market/{base}/{quote}/fills`)
+default view and the leaves room also read `/seqob`'s
+`/v1/market/{base}/{quote}/fills`, and the default view each market's `trades`)
 (`/seqob-chan` is reserved in `shared/book.js` and not deployed). All
-read-only from the site; fills and orders go through the wallet's `dex*`
-provider methods, which talk to the relay themselves.
+read-only from the site; trades and orders go through the wallet's provider
+methods (`placeOrder`, `getOrders`, `cancelOrder` in the default view, the `dex*`
+and leaf methods in the rooms), which talk to the relay themselves.
 
 <!-- BEGIN SHARED AGENT CONVENTIONS: identical in every Sequentia repo. Change it in all of them together. -->
 ## Working with git and GitHub here

@@ -4,12 +4,51 @@ The standalone SeqDEX website. It has no wallet of its own: every key
 operation goes through the Ambra browser extension (repo
 `sequentia-extension`) via `window.sequentia` (protocol:
 [`sequentia-extension/doc/PROVIDER.md`](https://github.com/ConcatenaLabs/sequentia-extension/blob/master/doc/PROVIDER.md)).
-Unlike the web wallet's terminal there is **no unified order book**: the site is
-deliberately split into three trading surfaces plus a channel marketplace,
-and the UI color-codes each surface so the user always knows which
-settlement world they are in.
+The site has two views. The default view is one market per pair, its book merged
+from the orders the wallet can settle in one step, and the wallet chooses how each
+trade settles; it names no rail. The developer view, shown while the wallet is in
+developer mode, adds one room per way of settling, each with its own book, never
+merged, colour-coded so the user always knows which settlement world they are in.
 
-## The four surfaces
+## The default view: markets (`index.html`, accent: neutral blue)
+
+One market per pair of assets, a book with its depth and a price chart, a market
+order and a limit order behind one form and one button, and the user's open orders
+and history. It is what every visitor sees unless the wallet is in developer mode or
+the site's override says otherwise (`?view=developer|default|wallet`, kept in the
+browser).
+
+- **Pairs.** Each pair is listed once, whichever way round its orders were listed:
+  BTC is always the quote, otherwise the asset worth less per unit is the quote, so
+  a price reads as one number above one. BTC pairs come first. The list is the
+  on-chain book's markets and the pure-Lightning book's BTC markets, plus the pairs
+  of what the connected wallet holds (with each other and with BTC) and the pair a
+  link names (`?pair=GOLD-USDX`), so the first order of a new market can be placed.
+- **The book.** Only orders the wallet settles in one step, merged
+  (`shared/market-book.js`): between two Sequentia assets, the covenant orders on
+  `/seqob`, read both ways round (an order selling the quote for the base, listed on
+  the reversed market, is a bid); against BTC, the pure-Lightning quotes on
+  `/seqob-pln` (`ln_direction` 2 or 3). Interactive, cross-chain on-chain and
+  confidential offers stay in the rooms. After a partial fill the relay keeps listing
+  a covenant order at the amount it was signed with; the book reads what the order
+  holds from the relay's fill records (the order rests again at the fill's output
+  2k+1). Levels are grouped by price, with their running depth.
+- **Values.** Prices and totals in the reference currency (the price server's
+  numbers), amounts in the asset's own units. The chart plots the pair's trades
+  (both orientations) valued at today's price of the quote.
+- **Trading.** `placeOrder` with the type, side, amount and, for a limit order, the
+  price; the wallet reads the book itself, picks the orders, settles each, and rests
+  what a limit order does not fill. The form's estimate is the page's own walk of
+  the book and says the wallet shows the exact amounts.
+- **Your orders.** `getOrders`, polled. An open order shows how much is filled, and
+  either a button to take back what is left (`cancelOrder`), once its time has run
+  out, or the words saying from when it can be. History lists each trade and each
+  order filled or taken back; a fill reads "Sent" until the relay calls it final
+  (its block certified and its Bitcoin anchor buried), then "Settled".
+- **No rail on the page.** No word of a room, rail, operator, covenant or atom; the
+  extension's `test/market/drive.mjs` reads the page's words in user mode.
+
+## The developer view's surfaces
 
 ### 1. LNDEX (accent: violet)
 Pure Lightning swaps only. No submarine or mixed rails: **both legs of every
@@ -134,9 +173,10 @@ developer mode, so no public page names it.
 ## What the site is
 
 Static ES modules, no bundler, no framework (house style). Served at
-`https://sequentiatestnet.com/dex/`. Pages: `index.html` (surface chooser),
-`lndex.html`, `onchain.html`, `confidential.html`, `channels.html`, and the
-developer-mode `leaves.html`, over a
+`https://sequentiatestnet.com/dex/`. Pages: `index.html` (the default view's
+markets), and in the developer view `rooms.html` (the room chooser), `lndex.html`,
+`onchain.html`, `confidential.html`, `channels.html` and the developer-mode
+`leaves.html`, over a
 shared core (`shared/`): provider glue, asset metadata (registry + prices),
 relay book client, UI tokens.
 
@@ -150,7 +190,8 @@ Live in `sequentia-extension` (`doc/PROVIDER.md` is the contract; changes
 land there first):
 
 - Shipped and used here: `connect`, `getAccounts`, `getNetwork`,
-  `getBalances`, `lnChannels` (per-asset spendable/receivable, the LNDEX
+  `getBalances`, in the default view `placeOrder`, `getOrders` and `cancelOrder`
+  (a wallet that does not list them in `getCapabilities` is asked to update), `lnChannels` (per-asset spendable/receivable, the LNDEX
   gate), `lnRequestInbound` (the marketplace phase-one purchase), and the
   DEX methods the wallet settles behind one approval: `dexSwapLn`,
   `dexMarketOrder`, `dexPlaceLimit`, `dexFillOnchain`, `dexJobResult`; in the
@@ -171,27 +212,12 @@ land there first):
 - Planned: BTC HTLC fills for on-chain cross swaps, blinded PSET decode for
   the confidential approval screen.
 
-## Phases
-
-Status as of 2026-08-22:
-
-- **P0 (shipped)**: site shell + all four pages with live books, wallet
-  connect, per-asset channel state, working inbound-liquidity request.
-- **P1 (shipped)**: LNDEX taker fills against the live pure-LN makers, end
-  to end, plus market and limit tickets served by the wallet.
-- **P2 (shipped)**: on-chain same-chain taker + covenant fills via
-  `dexFillOnchain`.
-- **P3 (open)**: cross-chain BTC (LN first, then on-chain HTLC). LNDEX
-  already trades BTC over Lightning where a maker offers it; on-chain
-  BTC-quoted fills are not served yet.
-- **P4 (shipped)**: confidential relay mount + blinded settlement.
-- **P5 (open)**: OpenAMP legs on the on-chain DEX; P2P channel-offer book.
-
 ## Design language
 
 Dark chassis (near-black, one family with the extension popup), Sequentia
 gold reserved for the on-chain surface and brand marks. Surface accents:
-LNDEX and Channels violet, on-chain gold, confidential teal, leaves lime. Type: Space
+LNDEX and Channels violet, on-chain gold, confidential teal, leaves lime; the
+default view settles every way at once and wears a neutral blue. Type: Space
 Grotesk for display and UI, IBM Plex Mono for numbers, books, and
 identifiers. The accent system is informational, not decorative: it encodes
 which settlement world the user is standing in.

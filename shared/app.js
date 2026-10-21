@@ -10,12 +10,36 @@ export const el = (t, c, txt) => {
   return e;
 };
 
+// The developer view's pages: one room per way of settling, and the leaves room. The
+// default view (index.html, the markets) names none of them; they are linked only while
+// the view is the developer one.
 const PAGES = [
+  ['index.html', 'Markets', 'market'],
+  ['rooms.html', 'Rooms', 'chain'],
   ['lndex.html', 'LNDEX', 'ln'],
   ['onchain.html', 'On-chain DEX', 'chain'],
   ['confidential.html', 'Confidential DEX', 'conf'],
   ['channels.html', 'Channels', 'ln'],
 ];
+
+// The view follows the wallet's mode ('developer' or 'user'; no wallet reads as user),
+// unless the site's own override says otherwise: `?view=developer` or `?view=default`
+// on any page sets it for this browser, `?view=wallet` clears it.
+const VIEW_KEY = 'seqdex.view';
+function viewOverride() {
+  let v = null;
+  try {
+    const q = new URLSearchParams(location.search).get('view');
+    if (q === 'developer' || q === 'default') localStorage.setItem(VIEW_KEY, q);
+    else if (q === 'wallet') localStorage.removeItem(VIEW_KEY);
+    v = localStorage.getItem(VIEW_KEY);
+  } catch { /* no storage: follow the wallet */ }
+  return v === 'developer' || v === 'default' ? v : null;
+}
+export function developerView(mode) {
+  const o = viewOverride();
+  return o ? o === 'developer' : mode === 'developer';
+}
 
 export async function initChrome(active) {
   const bar = document.querySelector('.topbar');
@@ -38,24 +62,32 @@ export async function initChrome(active) {
   bar.appendChild(bo);
 
   const nav = el('nav', 'nav');
+  nav.id = 'devNav';
+  const links = [];
   for (const [href, label, s] of PAGES) {
     const a = el('a', null, label);
     a.href = href;
     a.dataset.s = s;
     if (href === here || href === active) a.classList.add('on');
-    nav.appendChild(a);
+    links.push(a);
   }
-  bar.appendChild(nav);
-  bar.appendChild(el('span', 'spacer'));
   // The leaves room is a developer-mode room: its link is drawn only while the wallet
   // says it is in developer mode, and goes when it says otherwise.
   const devLink = el('a', null, 'Leaves');
   devLink.href = 'leaves.html'; devLink.dataset.s = 'leaf'; devLink.id = 'navLeaves';
   if (here === 'leaves.html' || active === 'leaves.html') devLink.classList.add('on');
+  bar.appendChild(nav);
+  bar.appendChild(el('span', 'spacer'));
+  // The developer view's links are drawn only in the developer view; the default view
+  // has no navigation beyond the wordmark, which leads to the markets.
   const showDev = (mode) => {
+    const dev = developerView(mode);
+    if (dev) { for (const a of links) if (!a.isConnected) nav.appendChild(a); }
+    else for (const a of links) a.remove();
     if (mode === 'developer') { if (!devLink.isConnected) nav.appendChild(devLink); }
     else devLink.remove();
   };
+  showDev(null);
 
   const btn = el('button', 'connect-btn');
   btn.id = 'btnConnect';
