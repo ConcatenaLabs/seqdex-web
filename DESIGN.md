@@ -89,11 +89,54 @@ Lightning without inbound capacity in that asset.
   (asset, capacity, fee, minimum duration); a buyer pays over Lightning or
   on-chain and the seller's node opens the channel.
 
+### 5. Leaves room (developer mode; accent: lime)
+On-chain orders filled from leaves, and orders placed on the chain from them.
+A leaf is a coin held in an operator's tree off the chain; the site's copy
+speaks only of leaves, rounds and the operator (this checkout is served as the
+site, its documents with it). The room
+exists only while the wallet says it is in developer mode (`getWalletMode`,
+then `modeChanged`): its page draws nothing of itself otherwise, and its link
+in the navigation and its tile on the index page are added by script only in
+developer mode, so no public page names it.
+
+- Book: the on-chain relay (`/seqob`), covenant orders only, in the pairs the
+  operator the wallet joined serves both assets of (`getLeafOperator`, which
+  also names the operator: its key, its server, its forfeit window and each
+  asset's fees). Each order is joined with the pair's fill records
+  (`/v1/market/{base}/{quote}/fills`, `shared/leaf-room.js`).
+- Settlement: the wallet's `takeOrder`, handed the relay's offer. The wallet's
+  leaf library finds the order on its own node and prices the fill by the
+  covenant's arithmetic; the operator's round spends the order, pays the maker
+  on the chain and pays the taker a leaf. The wallet hands the take's forfeits
+  over by itself within the operator's window, and takes the leaf once the round
+  is final.
+- States of a fill, from the wallet (`getLeafTakes`, `leafTake`) and the
+  relay's record of the round: submitted, round built, forfeits handed over, in
+  a round (in a block), final (the block certified and its Bitcoin anchor
+  buried), undone (the block left the chain; it counts again once mined again),
+  voided (the forfeits did not come in time; the coins are the taker's again).
+- What is not offered: the relay keeps listing an order filled whole until the
+  fill is final (held from its own matching), and lists the rest of an order
+  filled in part at its new outpoint as soon as the fill is in a block. The
+  room offers an order only when no fill in a block holds it, and shows the
+  reason in the row otherwise: "filled whole … not final" or "rests again after
+  a fill … not final". The operator's round would refuse both in any case (it
+  takes an order only once its transaction is final).
+- Placing: `placeOrderFromLeaves` with the amount sold, the amount wanted for
+  all of it (the room reduces the two to the covenant's rate), the smallest
+  fill and the refund time. The order rests on the chain with its maker
+  offline once its round is final; the wallet lists it on the relay itself, and
+  the room shows where it rests, its listing and its fills (`getLeafOrders`).
+  Fees are paid in the asset each operation moves (the asset sold for a
+  placement, the asset paid for a take), as the operator's schedule asks.
+- Values: atoms, with the reference currency where a price is known.
+
 ## What the site is
 
 Static ES modules, no bundler, no framework (house style). Served at
 `https://sequentiatestnet.com/dex/`. Pages: `index.html` (surface chooser),
-`lndex.html`, `onchain.html`, `confidential.html`, `channels.html`, over a
+`lndex.html`, `onchain.html`, `confidential.html`, `channels.html`, and the
+developer-mode `leaves.html`, over a
 shared core (`shared/`): provider glue, asset metadata (registry + prices),
 relay book client, UI tokens.
 
@@ -110,10 +153,15 @@ land there first):
   `getBalances`, `lnChannels` (per-asset spendable/receivable, the LNDEX
   gate), `lnRequestInbound` (the marketplace phase-one purchase), and the
   DEX methods the wallet settles behind one approval: `dexSwapLn`,
-  `dexMarketOrder`, `dexPlaceLimit`, `dexFillOnchain`, `dexJobResult`.
+  `dexMarketOrder`, `dexPlaceLimit`, `dexFillOnchain`, `dexJobResult`; in the
+  leaves room, `getLeafOperator`, `getLeafBalances`, `takeOrder`,
+  `getLeafTakes`, `placeOrderFromLeaves`, `getLeafOrders`, and the
+  `modeChanged`, `leafTake` and `leafArrived` events.
 - Also called, silently: `getCapabilities`, before any other method, so the
   site refuses a `window.sequentia` that does not identify itself as
-  `sequentia-wallet-extension` (any page script can define that global).
+  `sequentia-wallet-extension` (any page script can define that global);
+  and `getWalletMode` on every page, which decides whether the leaves room's
+  link and tile are drawn.
 - Shipped in the provider but deliberately not wrapped here: `getAddress`,
   `getUtxos`, `signPset`, `signMessage`, `broadcast`, `createInvoice`,
   `payInvoice`. The site never sees a UTXO, composes a PSET or handles an
@@ -143,7 +191,7 @@ Status as of 2026-08-22:
 
 Dark chassis (near-black, one family with the extension popup), Sequentia
 gold reserved for the on-chain surface and brand marks. Surface accents:
-LNDEX and Channels violet, on-chain gold, confidential teal. Type: Space
+LNDEX and Channels violet, on-chain gold, confidential teal, leaves lime. Type: Space
 Grotesk for display and UI, IBM Plex Mono for numbers, books, and
 identifiers. The accent system is informational, not decorative: it encodes
 which settlement world the user is standing in.

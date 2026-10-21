@@ -5,10 +5,16 @@ contract (surfaces, books, settlement phases, provider dependencies).
 
 ## Rules
 
-- **No unified order book.** The three surfaces are separate rooms by
-  product decision (user directive 2026-08-12): LNDEX (`/seqob-pln`,
-  `lightning.ln_direction` 2 or 3 only), on-chain (`/seqob`), confidential
-  (`/seqob-conf`, `pair.confidential == true` only). Do not merge them.
+- **No unified order book.** The surfaces are separate rooms by product
+  decision: LNDEX (`/seqob-pln`, `lightning.ln_direction` 2 or 3 only),
+  on-chain (`/seqob`), confidential (`/seqob-conf`, `pair.confidential == true`
+  only), and the developer-mode leaves room (`/seqob` covenant orders filled
+  and placed from leaves). Do not merge them.
+- **The leaves room exists only in developer mode.** It is drawn only while the
+  wallet answers `getWalletMode` with `developer`; its navigation link and index
+  tile are added by script then, never written into a page. Its copy speaks of
+  leaves, rounds and the operator, and never names the operator protocol: the
+  public site names no hidden product, and the static pages say nothing of it.
 - **The wallet drives everything sensitive.** No keys, no signing, no
   invoice handling in this repo; extend
   `sequentia-extension/doc/PROVIDER.md` first when a flow needs a new
@@ -21,6 +27,13 @@ contract (surfaces, books, settlement phases, provider dependencies).
 - Public copy: no em dashes; "Sequentia" is never abbreviated to SEQ; the
   token is "the Sequence token (SEQ)".
 
+## Tests
+
+`node --test` runs `test/*.test.mjs`: the leaves room's reading of the relay's
+book and fill records (`shared/leaf-room.js`). The room end to end, with the
+extension, an operator and a relay on a private chain, is the extension's
+`test/leaf-room/drive.mjs`, which serves this checkout as the site.
+
 ## Deploy
 
 Box clone `/srv/seqdex-web` (must live outside /root: Caddy's file_server runs as the caddy user and cannot traverse /root); Caddy serves it via `handle_path
@@ -31,7 +44,8 @@ Box clone `/srv/seqdex-web` (must live outside /root: Caddy's file_server runs a
 ## Endpoints consumed
 
 Same-origin under sequentiatestnet.com: `/registry/index.minimal.json`,
-`/prices`, the `/seqob`, `/seqob-pln` and `/seqob-conf` relay mounts
+`/prices`, the `/seqob`, `/seqob-pln` and `/seqob-conf` relay mounts (the
+leaves room also reads `/seqob`'s `/v1/market/{base}/{quote}/fills`)
 (`/seqob-chan` is reserved in `shared/book.js` and not deployed). All
 read-only from the site; fills and orders go through the wallet's `dex*`
 provider methods, which talk to the relay themselves.

@@ -108,6 +108,12 @@ export function onEvent(event, fn) {
   try { window.sequentia.on(event, fn); return true; } catch { return false; }
 }
 
+// The wallet's mode ('developer' | 'user'); null when it cannot say. Needs no
+// connection. The developer-mode rooms are drawn only while it says 'developer'.
+export async function walletMode() {
+  try { return (await request('getWalletMode')).mode || null; } catch { return null; }
+}
+
 // ---- typed helpers over the raw protocol (only what the site calls) ----
 export const getBalances = () => request('getBalances');
 export const lnChannels = () => request('lnChannels');
