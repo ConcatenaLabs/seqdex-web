@@ -119,3 +119,43 @@ export function servesPair(operator, base, quote) {
   const ids = new Set(list.map((a) => (typeof a === 'string' ? a : a.asset)).filter(Boolean));
   return ids.has(base) && ids.has(quote);
 }
+
+// ---- orders resting in the operator's tree ----
+//
+// An order resting as a leaf in an operator's tree (`resting_leaf`) is listed by the
+// relay at its locator: the coin it rests at now and what that coin holds, which the
+// relay moves at every fill from the operator's own view. Its fills are the relay's
+// records keyed by the operator's transfer id (`taker.via` "operator_tree"), final when the
+// round the order rests on is.
+
+// One resting order of the book as the room shows it, or null for any other offer:
+// its operator (key, URL), its id (the leaf id of its first coin), its locator, what
+// it can be filled for now (the relay's live size), its terms, and its fill records,
+// newest last. `fillable` says whether this wallet can fill it from its leaves: only
+// an order resting with the operator the wallet joined.
+export function restingRow(offer, fills, operatorKey) {
+  const t = offer && (offer.resting_leaf || offer.restingLeaf);
+  if (!t) return null;
+  const mine = (latestRecords(fills) || []).filter((f) => f.offer_id === offer.offer_id && f.taker && f.taker.via === 'operator_tree');
+  mine.sort((a, b) => (Date.parse(a.recorded || 0) || 0) - (Date.parse(b.recorded || 0) || 0));
+  const holds = String(offer._active ?? t.value ?? '0');
+  const sameOperator = !!operatorKey && String(t.operator_key || '').toLowerCase() === String(operatorKey).toLowerCase();
+  let why = null;
+  if (!sameOperator) why = 'rests with another operator than the one your wallet joined';
+  else if (BigInt(holds) <= 0n) why = 'its operator cannot be asked right now, so the relay lists it at nothing';
+  return {
+    offer, order: t.order_id, operator: t.operator_key, operatorUrl: t.operator_url,
+    coin: t.coin, value: String(t.value ?? '0'), holds,
+    rate: { num: String(t.rate_num), den: String(t.rate_den) }, minLot: String(t.min_lot),
+    fills: mine, fillable: sameOperator && BigInt(holds) > 0n, why,
+  };
+}
+
+// A fill record of a resting order, in the room's words.
+export function restingFillView(f) {
+  if (!f) return { key: 'unknown', label: 'unknown', detail: '' };
+  const round = f.taker && f.taker.round_txid ? f.taker.round_txid.slice(0, 12) + '…' : 'its round';
+  if (f.state === 'undone') return { key: 'undone', label: 'undone', detail: `the round its order rests on left the chain${f.reason ? ': ' + f.reason : ''}; the fill counts again once that round is mined again and final` };
+  if (f.state === 'final') return { key: 'final', label: 'final', detail: `the round ${round} its order rests on is final (${depth(f)})` };
+  return { key: 'confirmed', label: 'in the tree', detail: `co-signed by the operator; final once the round ${round} its order rests on is (${depth(f)})` };
+}

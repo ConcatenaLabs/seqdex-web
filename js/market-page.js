@@ -46,8 +46,16 @@ async function getJSON(url) {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
+// The relay's offers, each with its live size (`statuses[i].active_amount`, what it
+// can be filled for now) as `_active`.
 async function bookOffers(mount, base, quote) {
-  try { return (await getJSON(`${MOUNTS[mount]}/v1/market/${base}/${quote}/orderbook`)).offers || []; }
+  try {
+    const j = await getJSON(`${MOUNTS[mount]}/v1/market/${base}/${quote}/orderbook`);
+    return (j.offers || []).map((o, i) => {
+      const st = (j.statuses || [])[i];
+      return st && st.active_amount != null ? { ...o, _active: String(st.active_amount) } : o;
+    });
+  }
   catch { return []; }
 }
 async function relayList(mount, base, quote, what) {

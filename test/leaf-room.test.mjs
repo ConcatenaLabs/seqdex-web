@@ -72,3 +72,27 @@ test('a pair is served when the operator serves both assets', () => {
   assert.equal(servesPair(op, 'x', 'z'), false);
   assert.equal(servesPair({ assets: ['x', 'y'] }, 'y', 'x'), true);
 });
+
+import { restingRow, restingFillView } from '../shared/leaf-room.js';
+
+test('a resting order is shown at its locator, with its operator and its fills', () => {
+  const offer = { offer_id: 'r1', _active: '400000', resting_leaf: { operator_key: 'AB'.repeat(32), operator_url: 'https://op', order_id: 'd1'.repeat(32),
+    coin: 'e2'.repeat(32), value: '400000', rate_num: '2', rate_den: '1', min_lot: '10000' } };
+  const fills = [
+    { offer_id: 'r1', txid: 'aa'.repeat(32), spent: 'd1'.repeat(32), state: 'confirmed', recorded: '2026-10-22T01:00:00Z', taker: { via: 'operator_tree', round_txid: '77'.repeat(32) }, anchor_depth: 0, required_depth: 2 },
+    { offer_id: 'r1', txid: 'cc'.repeat(32), spent: 'xx', state: 'final', taker: { via: 'chain' } },
+  ];
+  const r = restingRow(offer, fills, 'ab'.repeat(32));
+  assert.equal(r.fillable, true);
+  assert.equal(r.coin, 'e2'.repeat(32));
+  assert.equal(r.holds, '400000');
+  assert.equal(r.fills.length, 1);
+  assert.equal(restingFillView(r.fills[0]).key, 'confirmed');
+  assert.equal(restingFillView({ ...r.fills[0], state: 'final' }).key, 'final');
+  assert.equal(restingFillView({ ...r.fills[0], state: 'undone' }).key, 'undone');
+  const other = restingRow(offer, fills, 'cd'.repeat(32));
+  assert.equal(other.fillable, false);
+  assert.match(other.why, /another operator/);
+  assert.equal(restingRow({ ...offer, _active: '0' }, [], 'ab'.repeat(32)).fillable, false);
+  assert.equal(restingRow({ offer_id: 'c', covenant: {} }, [], 'ab'.repeat(32)), null);
+});

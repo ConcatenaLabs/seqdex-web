@@ -1,7 +1,10 @@
 // The leaf room (developer mode): the on-chain covenant orders a taker paying from
 // leaves can fill through the operator the wallet joined, a fill paid from leaves
 // through the extension (`takeOrder`) with where it stands, and placing an order on
-// the chain from leaves (`placeOrderFromLeaves`).
+// the chain from leaves (`placeOrderFromLeaves`); and the orders resting as leaves in
+// operators' trees, each with its operator, its order id and its locator (the coin
+// it rests at and what that coin holds), filled from leaves (`fillRestingOrder`),
+// rested (`restOrder`) and cancelled (`cancelRestingOrder`).
 //
 // The room exists only while the wallet says it is in developer mode
 // (`getWalletMode`, then `modeChanged`); in user mode nothing of it is drawn. The
@@ -11,7 +14,7 @@
 import { initChrome, footer, $, el } from '../shared/app.js';
 import { assetMeta, fmtAtoms, usdFor } from '../shared/meta.js';
 import { MOUNTS, markets, orderbook, unexpired } from '../shared/book.js';
-import { fillableState, takeView, rateOf, servesPair, covenantOutpoint } from '../shared/leaf-room.js';
+import { fillableState, takeView, rateOf, servesPair, covenantOutpoint, restingRow, restingFillView } from '../shared/leaf-room.js';
 import * as P from '../shared/provider.js';
 
 const POLL_BUSY_MS = 4000;
@@ -21,7 +24,8 @@ await initChrome('leaves.html');
 footer();
 
 const room = $('room');
-const S = { mode: null, operator: null, opErr: null, rows: [], fills: new Map(), takes: [], orders: [], balances: null, timer: null, busy: null, again: false };
+const S = { mode: null, operator: null, opErr: null, rows: [], fills: new Map(), takes: [], orders: [], balances: null, timer: null, busy: null, again: false,
+  resting: [], myResting: [] };
 
 const tk = (h) => assetMeta(h).ticker;
 
@@ -74,7 +78,8 @@ function drawRoom() {
   rules.appendChild(el('b', null, 'The leaves room fills on-chain orders from your leaves, and places orders on the chain from them. '));
   rules.appendChild(document.createTextNode('Your operator’s round spends the order, pays its maker on the chain and pays you a leaf. '
     + 'A fill is final once its block is certified and its Bitcoin anchor buried; until then a Bitcoin reorganisation can undo it, and this room shows it undone. '
-    + 'An order placed from leaves is an ordinary on-chain order: it rests with you offline until filled, and only its refund takes it back. Values are in atoms.'));
+    + 'An order placed from leaves is an ordinary on-chain order: it rests with you offline until filled, and only its refund takes it back. '
+    + 'An order resting in the tree is a leaf the operator holds: takers fill it there, one transfer each that the operator co-signs, with its maker away; each fill rests what is left at a new coin, and its maker can cancel it with the operator. Values are in atoms.'));
   room.appendChild(rules);
   const grid = el('div', 'room-grid');
   const left = el('div'), right = el('div');
@@ -84,10 +89,13 @@ function drawRoom() {
   left.appendChild(panel('Orders you can fill from leaves', 'pOrders'));
   left.appendChild(panel('Your fills', 'pTakes'));
   left.appendChild(panel('Your orders placed from leaves', 'pMine'));
+  left.appendChild(panel('Orders resting in the tree', 'pResting'));
+  left.appendChild(panel('Your orders resting in the tree', 'pMyResting'));
   right.appendChild(panel('Operator', 'pOperator'));
   right.appendChild(panel('Your leaves', 'pLeaves'));
   right.appendChild(panel('Place an order from leaves', 'pPlace'));
-  drawOperator(); drawOrders(); drawTakes(); drawMine(); drawLeaves(); drawPlace();
+  right.appendChild(panel('Rest an order in the tree', 'pRest'));
+  drawOperator(); drawOrders(); drawTakes(); drawMine(); drawResting(); drawMyResting(); drawLeaves(); drawPlace(); drawRest();
 }
 
 function need(box) {
@@ -276,6 +284,147 @@ function drawPlace() {
   };
 }
 
+// The orders resting in the tree, each with its operator, its order id and where it
+// rests now (the locator the relay moves at every fill), and its fills.
+function drawResting() {
+  const p = body('pResting'); if (!p) return;
+  if (!S.resting.length) {
+    p.appendChild(el('p', 'sub', 'No order rests in an operator’s tree in the relay’s book right now.'));
+    p.appendChild(statusLine('restFillStatus'));
+    return;
+  }
+  for (const r of S.resting) {
+    const o = r.offer;
+    const box = el('div', 'take resting');
+    box.dataset.order = r.order;
+    box.dataset.offer = o.offer_id;
+    const head = el('div', 'wrow');
+    head.appendChild(el('span', 'pill', r.fillable ? 'resting' : 'not offered'));
+    head.appendChild(el('span', 'mono', `sells ${amt(r.holds, o.offer_asset)} for ${r.rate.num} ${tk(o.want_asset)} atoms per ${r.rate.den}`));
+    box.appendChild(head);
+    const kv = (k, v) => { const l = el('p', 'sub2 mono'); l.appendChild(el('span', 'faint', k + ' ')); l.appendChild(document.createTextNode(v)); box.appendChild(l); };
+    kv('operator', r.operator + (r.operatorUrl ? ' at ' + r.operatorUrl : ''));
+    kv('order', r.order);
+    kv('rests at', r.coin + ', holding ' + r.value + ' atoms');
+    kv('smallest fill', r.minLot + ' atoms');
+    for (const f of r.fills) {
+      const v = restingFillView(f);
+      const line = el('p', 'sub fill-' + v.key);
+      line.dataset.transfer = f.txid;
+      line.dataset.state = v.key;
+      line.textContent = `${v.label}: ${f.filled} filled from coin ${short(f.spent, 12)}, ${f.credit ? f.credit.value : '?'} to the maker (transfer ${short(f.txid, 12)}); ${v.detail}`;
+      box.appendChild(line);
+    }
+    if (r.fillable && P.account()) {
+      const row = el('div', 'wrow');
+      const inp = el('input', 'mono take-amt');
+      inp.placeholder = 'all (' + r.holds + ')';
+      inp.setAttribute('aria-label', 'Atoms of ' + tk(o.offer_asset) + ' to fill');
+      const b = el('button', 'btn small', 'Fill from leaves');
+      b.type = 'button';
+      b.onclick = () => fillResting(r, inp.value.trim(), b);
+      row.appendChild(inp); row.appendChild(b);
+      box.appendChild(row);
+    } else if (r.why) {
+      box.appendChild(el('p', 'sub not-fillable', r.why));
+    }
+    p.appendChild(box);
+  }
+  p.appendChild(statusLine('restFillStatus'));
+}
+
+function drawMyResting() {
+  const p = body('pMyResting'); if (!p || need(p)) return;
+  if (!S.myResting.length) { p.appendChild(el('p', 'sub', 'Orders you rest in the tree appear here: resting, filled, cancelled, with the credits paid to you.')); p.appendChild(statusLine('restCancelStatus')); return; }
+  for (const o of [...S.myResting].reverse()) {
+    const box = el('div', 'take');
+    box.dataset.order = o.order || o.rested_by;
+    box.dataset.state = o.state || '';
+    const head = el('div', 'wrow');
+    head.appendChild(el('span', 'pill', o.state === 'participating' ? 'waiting for its round' : (o.state || '…')));
+    head.appendChild(el('span', 'mono', o.holds != null ? `holds ${o.holds} of ${o.amount} atoms` : `${o.amount} atoms`));
+    head.appendChild(el('span', 'amt faint mono', short(o.order || o.rested_by, 10)));
+    box.appendChild(head);
+    const lines = [];
+    if (o.coin) lines.push('rests at ' + o.coin);
+    if (o.listed) lines.push('listed on the relay as ' + o.offer_id);
+    else if (o.state === 'resting') lines.push(o.post_error ? 'not listed yet: ' + o.post_error : 'listing on the relay…');
+    if (o.fills && o.fills.length) lines.push(o.fills.length + ' fill(s) in the tree');
+    if (o.credits && o.credits.length) lines.push(o.credits.length + ' credit(s) held: ' + o.credits.map((c) => c.value).join(', ') + ' atoms');
+    box.appendChild(el('p', 'sub', lines.join(' · ')));
+    if (o.state === 'resting' && o.order) {
+      const b = el('button', 'btn small', 'Cancel');
+      b.type = 'button';
+      b.onclick = () => cancelResting(o, b);
+      box.appendChild(b);
+    }
+    p.appendChild(box);
+  }
+  p.appendChild(statusLine('restCancelStatus'));
+}
+
+function drawRest() {
+  const p = body('pRest'); if (!p || need(p)) return;
+  const served = (S.operator && S.operator.assets || []).map((a) => (typeof a === 'string' ? a : a.asset)).filter(Boolean);
+  const sel = (id) => { const s = el('select', 'mono'); s.id = id; for (const a of served) { const o = el('option', null, tk(a)); o.value = a; s.appendChild(o); } return s; };
+  const field = (label, input) => { const l = el('label', 'field'); l.appendChild(el('span', 'sub', label)); l.appendChild(input); p.appendChild(l); return input; };
+  const txt = (id, ph) => { const i = el('input', 'mono'); i.id = id; i.placeholder = ph || ''; i.autocomplete = 'off'; return i; };
+  const sell = field('Sell', sel('rsSell'));
+  const amount = field('Atoms to sell', txt('rsAmount'));
+  const want = field('For', sel('rsWant'));
+  if (served.length > 1) want.value = served[1];
+  const total = field('Atoms wanted for all of it', txt('rsTotal'));
+  const lot = field('Smallest fill, atoms', txt('rsLot', 'the order’s whole amount'));
+  const b = el('button', 'btn', 'Rest in the tree');
+  b.type = 'button'; b.id = 'btnRest';
+  p.appendChild(b);
+  p.appendChild(statusLine('restStatus'));
+  p.appendChild(el('p', 'sub2 faint', 'The next round makes the order’s leaf. Keep the wallet open until its round is final and the wallet has listed it; then takers fill it in the tree while you are away, and each fill’s credit is yours at the wallet’s next sync.'));
+  b.onclick = async () => {
+    say('restStatus', '', '');
+    try {
+      if (sell.value === want.value) throw new Error('an order sells one asset for another');
+      const r = rateOf(amount.value.trim(), total.value.trim());
+      const params = { sell: sell.value, want: want.value, amount: amount.value.trim(), rate_num: r.num, rate_den: r.den };
+      if (lot.value.trim()) params.min_lot = lot.value.trim();
+      b.disabled = true;
+      say('restStatus', '', 'Waiting for your approval in the wallet…');
+      const out = await P.request('restOrder', params);
+      say('restStatus', 'ok', `Rested: order ${short(out.order, 16)} (${out.state}). Its round makes the leaf; the wallet lists it once the operator holds it.`);
+      await refresh();
+    } catch (e) {
+      say('restStatus', 'err', e.message);
+    } finally { b.disabled = false; }
+  };
+}
+
+async function fillResting(r, amount, btn) {
+  say('restFillStatus', '', 'Waiting for your approval in the wallet…');
+  btn.disabled = true;
+  try {
+    const params = { order: r.offer };
+    if (amount) params.amount = amount;
+    const out = await P.request('fillRestingOrder', params);
+    const t = out.answer && out.answer.transfer_id;
+    say('restFillStatus', 'ok', `Filled ${out.filled} for ${out.paid} + fee ${out.fee}${t ? ' (transfer ' + short(t, 16) + ')' : ''}${out.moved_from ? '; the order had moved from ' + short(out.moved_from, 12) + ', and was filled where it rests now' : ''}.`);
+    await refresh();
+  } catch (e) {
+    say('restFillStatus', 'err', e.message);
+  } finally { btn.disabled = false; }
+}
+
+async function cancelResting(o, btn) {
+  say('restCancelStatus', '', 'Waiting for your approval in the wallet…');
+  btn.disabled = true;
+  try {
+    const out = await P.request('cancelRestingOrder', { order: o.order });
+    say('restCancelStatus', 'ok', `Cancelled order ${short(out.order, 16)}: what rested is a leaf of yours again.`);
+    await refresh();
+  } catch (e) {
+    say('restCancelStatus', 'err', e.message);
+  } finally { btn.disabled = false; }
+}
+
 async function take(r, amount, btn) {
   say('takeStatus', '', 'Waiting for your approval in the wallet…');
   btn.disabled = true;
@@ -304,12 +453,15 @@ async function readAll() {
   if (!S.operator) {
     try { S.operator = await P.request('getLeafOperator'); S.opErr = null; } catch (e) { S.opErr = e.message; }
   }
-  const [takes, orders, bal] = await Promise.allSettled([P.request('getLeafTakes'), P.request('getLeafOrders'), P.request('getLeafBalances')]);
+  const [takes, orders, bal, mine] = await Promise.allSettled([P.request('getLeafTakes'), P.request('getLeafOrders'), P.request('getLeafBalances'),
+    P.request('getRestingOrders')]);
   if (takes.status === 'fulfilled') S.takes = takes.value.takes || [];
+  if (mine.status === 'fulfilled') S.myResting = mine.value.orders || [];
   if (orders.status === 'fulfilled') S.orders = orders.value.orders || [];
   if (bal.status === 'fulfilled') S.balances = bal.value;
   const rows = [];
   const fills = new Map();
+  const resting = [];
   if (S.operator) {
     let mkts = [];
     try { mkts = await markets('chain'); } catch { /* the book is unreachable: no rows */ }
@@ -323,6 +475,11 @@ async function readAll() {
       let offers = [];
       try { offers = unexpired(await orderbook('chain', m.base, m.quote)); } catch { continue; }
       for (const o of offers) {
+        if (o.resting) {
+          const r = restingRow(o.raw, fills.get(m.base + '/' + m.quote), S.operator.operator);
+          if (r) resting.push(r);
+          continue;
+        }
         if (!o.covenant || o.side !== 'ask') continue;
         let state = fillableState(o.raw, fills.get(m.base + '/' + m.quote));
         const at = covenantOutpoint(o.raw);
@@ -334,11 +491,14 @@ async function readAll() {
   }
   S.rows = rows;
   S.fills = fills;
+  S.resting = resting;
 }
 
 function busy() {
   return S.takes.some((t) => !['final', 'void'].includes(takeView(t, S.fills.get(pairKey(t.pair)) || []).key))
-    || S.orders.some((o) => ['waiting', 'in_round', 'unlocking'].includes(o.state) || (o.state === 'resting' && !o.posted));
+    || S.orders.some((o) => ['waiting', 'in_round', 'unlocking'].includes(o.state) || (o.state === 'resting' && !o.posted))
+    || S.myResting.some((o) => o.state === 'participating' || (o.state === 'resting' && !o.listed))
+    || S.resting.some((r) => r.fills.some((f) => f.state !== 'final'));
 }
 
 // One read at a time; a refresh asked for while one runs runs once more after it, so
@@ -351,10 +511,12 @@ async function refresh() {
       S.again = false;
       await readAll();
       if (S.mode !== 'developer') return;
-      drawOperator(); drawOrders(); drawTakes(); drawMine(); drawLeaves();
-      // The form's assets are the operator's: drawn again once they are known.
+      drawOperator(); drawOrders(); drawTakes(); drawMine(); drawResting(); drawMyResting(); drawLeaves();
+      // The forms' assets are the operator's: drawn again once they are known.
       const sel = $('plSell'), n = ((S.operator && S.operator.assets) || []).length;
       if (P.account() && (!sel || sel.options.length !== n)) drawPlace();
+      const rsel = $('rsSell');
+      if (P.account() && (!rsel || rsel.options.length !== n)) drawRest();
     } while (S.again);
   })().finally(() => { S.busy = null; });
   return S.busy;
@@ -371,11 +533,11 @@ async function apply(mode) {
   if (mode !== 'developer') { clearTimeout(S.timer); drawAbsent(); return; }
   drawRoom();
   await refresh().catch(() => {});
-  drawPlace();
+  drawPlace(); drawRest();
   schedule();
 }
 
-P.onAccountChange(() => { if (S.mode === 'developer') { S.operator = null; drawRoom(); refresh().then(drawPlace).catch(() => {}); } });
+P.onAccountChange(() => { if (S.mode === 'developer') { S.operator = null; drawRoom(); refresh().then(() => { drawPlace(); drawRest(); }).catch(() => {}); } });
 P.onProvider(() => {
   P.onEvent('modeChanged', (d) => apply(d && d.mode));
   P.onEvent('leafTake', () => refresh().catch(() => {}));
