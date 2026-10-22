@@ -25,8 +25,10 @@ browser).
   of what the connected wallet holds (with each other and with BTC) and the pair a
   link names (`?pair=GOLD-USDX`), so the first order of a new market can be placed.
 - **The book.** Only orders the wallet settles in one step, merged
-  (`shared/market-book.js`): between two Sequentia assets, the covenant orders on
-  `/seqob`, read both ways round (an order selling the quote for the base, listed on
+  (`shared/market-book.js`): between two Sequentia assets, the orders on `/seqob`
+  that fill with their makers away (covenant orders on the chain, and orders resting
+  as leaves in an operator's tree, offer member `resting_leaf`, each at its relay's
+  live size, `statuses[i].active_amount`), read both ways round (an order selling the quote for the base, listed on
   the reversed market, is a bid); against BTC, the pure-Lightning quotes on
   `/seqob-pln` (`ln_direction` 2 or 3). Interactive, cross-chain on-chain and
   confidential offers stay in the rooms. After a partial fill the relay keeps listing
@@ -143,8 +145,13 @@ then `modeChanged`): its page draws nothing of itself otherwise, and its link
 in the navigation and its tile on the index page are added by script only in
 developer mode, so no public page names it.
 
-- Book: the on-chain relay (`/seqob`), covenant orders only, in the pairs the
-  operator the wallet joined serves both assets of (`getLeafOperator`, which
+- Book: the on-chain relay (`/seqob`), covenant orders and orders resting as
+  leaves in an operator's tree, in the pairs the operator the wallet joined serves
+  both assets of. A resting order is shown with its operator (key and URL), its order
+  id and its locator: the coin it rests at now and what that coin holds, which the
+  relay moves at every fill; and its fill records (taker `operator_tree`, keyed by
+  the operator's transfer id, final with the round the order rests on). Only one of
+  the joined operator is offered a Fill button (`getLeafOperator`, which
   also names the operator: its key, its server, its forfeit window and each
   asset's fees). Each order is joined with the pair's fill records
   (`/v1/market/{base}/{quote}/fills`, `shared/leaf-room.js`).
@@ -201,7 +208,8 @@ land there first):
   DEX methods the wallet settles behind one approval: `dexSwapLn`,
   `dexMarketOrder`, `dexPlaceLimit`, `dexFillOnchain`, `dexJobResult`; in the
   leaves room, `getLeafOperator`, `getLeafBalances`, `takeOrder`,
-  `getLeafTakes`, `placeOrderFromLeaves`, `getLeafOrders`, and the
+  `getLeafTakes`, `placeOrderFromLeaves`, `getLeafOrders`, `restOrder`,
+  `fillRestingOrder`, `cancelRestingOrder`, `getRestingOrders`, and the
   `modeChanged`, `leafTake` and `leafArrived` events.
 - Also called, silently: `getCapabilities`, before any other method, so the
   site refuses a `window.sequentia` that does not identify itself as

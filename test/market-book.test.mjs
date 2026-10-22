@@ -93,3 +93,18 @@ test('a market shows one price: the middle of the book, else the last trade, els
   assert.equal(marketPrice(oneSide, []), null);
   assert.equal(PRICE_WORDS.mid, 'middle of the book');
 });
+
+test('a resting order is one more order of its market, at what its coin holds', () => {
+  const A = 'aa'.repeat(32), B = 'bb'.repeat(32);
+  const ask = { offer_id: 'r', offer_asset: A, want_asset: B, offer_amount: '600000', _active: '400000',
+    resting_leaf: { rate_num: '2', rate_den: '1', value: '400000', coin: 'e2'.repeat(32) } };
+  const bid = { offer_id: 'q', offer_asset: B, want_asset: A, offer_amount: '1000000',
+    resting_leaf: { rate_num: '1', rate_den: '4', value: '800000', coin: 'e3'.repeat(32) } };
+  const opts = { base: A, quote: B, basePrec: 0, quotePrec: 0 };
+  assert.deepEqual(rowOf(ask, opts), { side: 'ask', size: 400000n, total: 800000n, price: 2, id: 'r' });
+  assert.deepEqual(rowOf(bid, opts), { side: 'bid', size: 200000n, total: 800000n, price: 4, id: 'q' });
+  assert.equal(rowOf({ ...ask, _active: '0' }, opts), null);
+  const book = mergeBook([ask, bid], opts);
+  assert.equal(book.best.ask, 2);
+  assert.equal(book.best.bid, 4);
+});

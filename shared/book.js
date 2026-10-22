@@ -32,7 +32,11 @@ export async function orderbook(mount, base, quote) {
   // The blinded book is a separate namespace on its relay, selected by query.
   const q = mount === 'conf' ? '?confidential=1' : '';
   const j = await getJSON(`${MOUNTS[mount]}/v1/market/${encodeURIComponent(base)}/${encodeURIComponent(quote)}/orderbook${q}`);
-  return (j.offers || []).map(normalizeOffer).filter(Boolean);
+  // statuses[i] is offers[i]'s live state: what it can be filled for now.
+  return (j.offers || []).map((o, i) => {
+    const st = (j.statuses || [])[i];
+    return normalizeOffer(st && st.active_amount != null ? { ...o, _active: String(st.active_amount) } : o);
+  }).filter(Boolean);
 }
 
 // One offer, normalized for display. Prices are quote-atoms per base-unit,
@@ -55,6 +59,7 @@ function normalizeOffer(o) {
       lnDirection: o.lightning ? Number(o.lightning.ln_direction ?? -1) : null,
       confidential: !!o.confidential,
       covenant: !!o.covenant,
+      resting: !!o.resting_leaf,
       raw: o,
     };
   } catch { return null; }

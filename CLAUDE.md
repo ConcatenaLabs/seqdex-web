@@ -6,8 +6,10 @@ contract (surfaces, books, settlement phases, provider dependencies).
 ## Rules
 
 - **Two views.** The default view (`index.html`) is one market per pair, its book
-  merged from the orders the wallet settles in one step only: covenant orders on
-  `/seqob` read both ways round (a reversed market's order is a bid), and, against
+  merged from the orders the wallet settles in one step only: covenant orders and
+  orders resting as leaves in an operator's tree (`resting_leaf`, listed at the relay's
+  live size, `statuses[i].active_amount`) on `/seqob`, read both ways round (a
+  reversed market's order is a bid), and, against
   BTC, the pure-Lightning quotes on `/seqob-pln` (`ln_direction` 2 or 3). Trades go
   through the wallet's rail-blind `placeOrder`, `getOrders` and `cancelOrder`; the
   page names no rail, room, operator, covenant or atom, and shows prices and totals
@@ -23,7 +25,8 @@ contract (surfaces, books, settlement phases, provider dependencies).
 - **A fill is shown settled only when the relay calls it final** (`/fills`, state
   `final`); until then it reads "Sent". After a partial fill the relay keeps listing
   a covenant order at the amount it was signed with: the book reads what it holds
-  from the fill records (`remaindersOf`), the wallet from the chain.
+  from the fill records (`remaindersOf`), the wallet from the chain. A resting order's
+  listing moves with it (its locator), so the book reads its size from the relay.
 - **The leaves room exists only in developer mode.** It is drawn only while the
   wallet answers `getWalletMode` with `developer`; its navigation link and index
   tile are added by script then, never written into a page. Its copy speaks of
@@ -46,10 +49,12 @@ contract (surfaces, books, settlement phases, provider dependencies).
 
 `node --test` runs `test/*.test.mjs`: the default view's market (pair orientation,
 the merged book, the chart's series, typed amounts; `shared/market-book.js`) and the
-leaves room's reading of the relay's book and fill records (`shared/leaf-room.js`).
+leaves room's reading of the relay's book and fill records (`shared/leaf-room.js`,
+covenant orders and resting orders).
 End to end, each with the extension and a relay on a private chain, the extension's
 `test/market/drive.mjs` drives the default view and its `test/leaf-room/drive.mjs`
-the leaves room; both serve this checkout as the site.
+the leaves room, and its `test/resting/drive.mjs` orders resting in the operator's
+tree through both views; all serve this checkout as the site.
 
 ## Deploy
 

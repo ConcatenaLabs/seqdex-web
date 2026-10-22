@@ -4,8 +4,10 @@
 // page formats it; prices are quote units per base unit (numbers, for display only).
 //
 // Sources, read the same way whichever way round a maker listed an order:
-//  - between two Sequentia assets, the covenant orders on the on-chain book: an order
-//    selling the base for the quote is an ask; one selling the quote for the base,
+//  - between two Sequentia assets, the orders on the on-chain book's relay that fill
+//    with their makers away: covenant orders on the chain, and orders resting as leaves
+//    in an operator's tree (`resting_leaf`), each listed at what its coin holds now. An
+//    order selling the base for the quote is an ask; one selling the quote for the base,
 //    listed on the reversed market, is a bid;
 //  - against BTC, the quotes of the makers who settle instantly (the pure-Lightning
 //    offers, `lightning.ln_direction` 2 or 3).
@@ -74,12 +76,20 @@ export function rowOf(o, { base, quote, basePrec, quotePrec, remainders = new Ma
     const total = big(bid ? o.offer_amount : o.want_amount);
     return { side: bid ? 'bid' : 'ask', size, total, price: (Number(total) / Number(size)) * scale, id: o.offer_id };
   }
-  const ct = o.covenant;
+  const ct = o.covenant || o.resting_leaf;
   if (!ct) return null;
   const num = big(ct.rate_num), den = big(ct.rate_den);
   if (num <= 0n || den <= 0n) return null;
-  const at = `${ct.covenant_txid}:${Number(ct.covenant_vout || 0)}`;
-  const locked = remainders.has(at) ? remainders.get(at) : big(o.offer_amount);
+  let locked;
+  if (o.resting_leaf) {
+    // What the coin it rests at holds now: the relay's live size (statuses[i]), which
+    // is 0 while its operator cannot be asked, else the locator the relay moves at
+    // every fill.
+    locked = big(o._active ?? ct.value);
+  } else {
+    const at = `${ct.covenant_txid}:${Number(ct.covenant_vout || 0)}`;
+    locked = remainders.has(at) ? remainders.get(at) : big(o.offer_amount);
+  }
   if (locked <= 0n) return null;
   const sells = String(o.offer_asset || '').toLowerCase(), wants = String(o.want_asset || '').toLowerCase();
   if (sells === base && wants === quote) {
