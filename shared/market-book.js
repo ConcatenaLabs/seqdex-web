@@ -10,9 +10,14 @@
 //    order selling the base for the quote is an ask; one selling the quote for the base,
 //    listed on the reversed market, is a bid;
 //  - against BTC, the quotes of the makers who settle instantly (the pure-Lightning
-//    offers, `lightning.ln_direction` 2 or 3).
+//    offers, `lightning.ln_direction` 2 or 3);
+//  - the two sides of a maker's pool (`pool`), each at what its coin holds above its
+//    reserve, when the wallet settles a pool's fill (`pools`): the pool's ask sells
+//    its base at the ask, its bid buys it at the bid.
 // Other offer families (interactive, cross-chain, confidential) are not in this view:
 // each needs a step or a choice the default view does not offer.
+
+import { poolRowOf } from './pool-room.js';
 
 const big = (v) => BigInt(v ?? 0);
 
@@ -62,7 +67,7 @@ export function remaindersOf(fills) {
 
 // One order as a row of the merged book, or null when it is not one the default view
 // takes. `price` is quote units per base unit; `size` base atoms; `total` quote atoms.
-export function rowOf(o, { base, quote, basePrec, quotePrec, remainders = new Map(), nowSec = Math.floor(Date.now() / 1000) }) {
+export function rowOf(o, { base, quote, basePrec, quotePrec, remainders = new Map(), pools = false, nowSec = Math.floor(Date.now() / 1000) }) {
   if (Number(o.expires_at_unix || 0) > 0 && Number(o.expires_at_unix) <= nowSec) return null;
   const scale = Math.pow(10, basePrec - quotePrec);
   if (quote === 'BTC') {
@@ -75,6 +80,11 @@ export function rowOf(o, { base, quote, basePrec, quotePrec, remainders = new Ma
     const bid = o.trade_dir === 'TRADE_DIR_BUY';
     const total = big(bid ? o.offer_amount : o.want_amount);
     return { side: bid ? 'bid' : 'ask', size, total, price: (Number(total) / Number(size)) * scale, id: o.offer_id };
+  }
+  if (o.pool) {
+    // A side of a maker's pool, at what its coin holds above its reserve (the relay's
+    // live size). Listed only when the wallet settles a pool's fill (`pools`).
+    return pools ? poolRowOf(o, { base, quote, basePrec, quotePrec }) : null;
   }
   const ct = o.covenant || o.resting_leaf;
   if (!ct) return null;

@@ -28,6 +28,9 @@ per way of settling, each with its own book, unmerged:
   for LNDEX traders.
 - **Leaves room**: on-chain orders filled from leaves held in an operator's tree,
   and orders placed on the chain from them (DESIGN.md, "Leaves room").
+- **Pools room**: the makers' pools of the on-chain book, each side at what its coin
+  holds above its reserve, and the clearing rounds at their one price (DESIGN.md,
+  "Pools room").
 
 `?view=developer` or `?view=default` on any page sets the view for this browser
 whatever the wallet's mode; `?view=wallet` follows the wallet again.
