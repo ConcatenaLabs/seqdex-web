@@ -76,6 +76,10 @@ export async function initChrome(active) {
   const devLink = el('a', null, 'Leaves');
   devLink.href = 'leaves.html'; devLink.dataset.s = 'leaf'; devLink.id = 'navLeaves';
   if (here === 'leaves.html' || active === 'leaves.html') devLink.classList.add('on');
+  // So is the pools room: the makers' pools and the clearing rounds.
+  const poolLink = el('a', null, 'Pools');
+  poolLink.href = 'pools.html'; poolLink.dataset.s = 'chain'; poolLink.id = 'navPools';
+  if (here === 'pools.html' || active === 'pools.html') poolLink.classList.add('on');
   bar.appendChild(nav);
   bar.appendChild(el('span', 'spacer'));
   // The developer view's links are drawn only in the developer view; the default view
@@ -84,8 +88,10 @@ export async function initChrome(active) {
     const dev = developerView(mode);
     if (dev) { for (const a of links) if (!a.isConnected) nav.appendChild(a); }
     else for (const a of links) a.remove();
-    if (mode === 'developer') { if (!devLink.isConnected) nav.appendChild(devLink); }
-    else devLink.remove();
+    if (mode === 'developer') {
+      if (!devLink.isConnected) nav.appendChild(devLink);
+      if (!poolLink.isConnected) nav.appendChild(poolLink);
+    } else { devLink.remove(); poolLink.remove(); }
   };
   showDev(null);
 

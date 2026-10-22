@@ -29,7 +29,10 @@ browser).
   that fill with their makers away (covenant orders on the chain, and orders resting
   as leaves in an operator's tree, offer member `resting_leaf`, each at its relay's
   live size, `statuses[i].active_amount`), read both ways round (an order selling the quote for the base, listed on
-  the reversed market, is a bid); against BTC, the pure-Lightning quotes on
+  the reversed market, is a bid); and the two sides of a maker's pool (offer member
+  `pool`), the ask at the pool's ask and the bid at its bid, each at what its coin holds
+  above its reserve, once the wallet settles a pool's fill (its provider lists
+  `dexFillPool`); against BTC, the pure-Lightning quotes on
   `/seqob-pln` (`ln_direction` 2 or 3). Interactive, cross-chain on-chain and
   confidential offers stay in the rooms. After a partial fill the relay keeps listing
   a covenant order at the amount it was signed with; the book reads what the order
@@ -181,6 +184,27 @@ developer mode, so no public page names it.
   Fees are paid in the asset each operation moves (the asset sold for a
   placement, the asset paid for a take), as the operator's schedule asks.
 - Values: atoms, with the reference currency where a price is known.
+
+### 6. Pools room (developer mode; accent: gold)
+The makers' pools of the on-chain book and the clearing rounds, read only
+(`pools.html`, `js/pools-room.js`, joined in `shared/pool-room.js`). Like the
+leaves room it exists only while the wallet says it is in developer mode, and its
+link and tile are added by script then.
+
+- Pools: a pool (offer member `pool`, the template seqdex/pool) is a maker's two
+  coins, one of each asset, which anyone fills on the chain at its quotes and only
+  the maker's key withdraws. It lists two offers on `/seqob`, its ask (base for
+  quote) and its bid (quote for base, on the reversed market), each at what its own
+  coin holds above that coin's reserve (`statuses[i].active_amount`). The room shows
+  each pool once: its ask and bid, what each side holds above its reserve, its
+  reserves and minimum lot, the coins it rests at and its maker's key.
+- Clearing rounds: `/seqob/v1/rounds`, each round at the one price its last output
+  publishes, with the round orders it filled (offer member `round_order`), the pools
+  it moved, and where it stands: in a block, final (certified, its Bitcoin anchor
+  buried), or undone by a Bitcoin reorganisation, in which case the orders and the
+  pools are listed again where they rested before.
+- The room places nothing: a round order is filled only in a round its clearer
+  signs, and a pool by the pool's own fill.
 
 ## What the site is
 

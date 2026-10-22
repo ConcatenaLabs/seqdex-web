@@ -21,9 +21,25 @@ function leafTile(mode) {
   a.appendChild(el('p', null, 'Fill on-chain orders from your leaves through your operator\u2019s round, and place orders on the chain from them. Shown because your wallet is in developer mode.'));
   document.querySelector('.tiles').appendChild(a);
 }
+// The pools room is a developer-mode room too: the makers' pools and the clearing
+// rounds of the on-chain book, read only.
+function poolTile(mode) {
+  const have = document.getElementById('tilePools');
+  if (mode !== 'developer') { if (have) have.remove(); return; }
+  if (have) return;
+  const a = el('a', 'tile tile-chain');
+  a.id = 'tilePools';
+  a.href = 'pools.html';
+  const h = el('h3');
+  h.appendChild(el('small', null, 'Developer mode · pools'));
+  h.appendChild(document.createTextNode('Pools and clearing rounds'));
+  a.appendChild(h);
+  a.appendChild(el('p', null, 'The makers\u2019 pools of the on-chain book, each side at what its coin holds above its reserve, and every clearing round at its one price. Shown because your wallet is in developer mode.'));
+  document.querySelector('.tiles').appendChild(a);
+}
 P.onProvider(() => {
-  P.walletMode().then(leafTile).catch(() => {});
-  P.onEvent('modeChanged', (d) => leafTile(d && d.mode));
+  P.walletMode().then((m) => { leafTile(m); poolTile(m); }).catch(() => {});
+  P.onEvent('modeChanged', (d) => { leafTile(d && d.mode); poolTile(d && d.mode); });
 });
 
 // A tile's live line is built from nodes, never from markup: the numbers come

@@ -185,7 +185,9 @@ export async function runMarketPage() {
   // ---- book and chart ----
   // One market's merged book and its trades, as the chart plots them.
   async function loadMarket(p) {
-    const opts = { base: p.base, quote: p.quote, basePrec: prec(p.base), quotePrec: prec(p.quote) };
+    // A maker's pool is depth here only when the wallet settles a pool's fill.
+    const opts = { base: p.base, quote: p.quote, basePrec: prec(p.base), quotePrec: prec(p.quote),
+      pools: await P.supports('dexFillPool').catch(() => false) };
     let offers = [], trades = [], reversed = [];
     if (p.quote === 'BTC') {
       offers = await bookOffers('ln', p.base, p.quote);

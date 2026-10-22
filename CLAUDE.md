@@ -50,7 +50,8 @@ contract (surfaces, books, settlement phases, provider dependencies).
 `node --test` runs `test/*.test.mjs`: the default view's market (pair orientation,
 the merged book, the chart's series, typed amounts; `shared/market-book.js`) and the
 leaves room's reading of the relay's book and fill records (`shared/leaf-room.js`,
-covenant orders and resting orders).
+covenant orders and resting orders), and the pools room's reading of pools and
+clearing rounds (`shared/pool-room.js`, both orientations of a pool's two sides).
 End to end, each with the extension and a relay on a private chain, the extension's
 `test/market/drive.mjs` drives the default view and its `test/leaf-room/drive.mjs`
 the leaves room, and its `test/resting/drive.mjs` orders resting in the operator's
