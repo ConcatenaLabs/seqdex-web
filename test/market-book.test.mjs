@@ -114,4 +114,5 @@ test('a book read the other way round: asks become bids at the inverse price, si
   // The wallet's one figure per asset: its total where it answers one, else chain + leaves.
   assert.deepEqual(spendableOf({ total: { a: '5' }, assets: { a: '1' } }), { a: '5' });
   assert.deepEqual(spendableOf({ btc: '7', assets: { a: '1' }, leaves: { a: '2' } }), { BTC: '7', a: '3' });
+  assert.deepEqual(spendableOf({ btc: '7', btc_ark: '3', assets: {}, leaves: { a: '2' } }), { BTC: '10', a: '2' });
 });

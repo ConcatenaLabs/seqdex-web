@@ -251,7 +251,7 @@ async function pairPhone(c) {
   const box = el('div', 'pair-modal'); box.id = 'pairModal';
   const card = el('div', 'pair-card');
   card.appendChild(el('h2', null, 'Pair Ambra mobile'));
-  card.appendChild(el('p', 'sub', 'Scan this code with Ambra mobile (Settings, Connect to a site), or open the link on the phone Ambra mobile is on. Ambra mobile shows this site and asks you to approve.'));
+  card.appendChild(el('p', 'sub', 'Scan this code with Ambra mobile (More, Sites, Connect to a site), or open the link on the phone Ambra mobile is on. Ambra mobile shows this site and asks you to approve.'));
   const qr = el('div', 'pair-qr'); qr.id = 'pairQr';
   card.appendChild(qr);
   const link = el('a', 'pair-link', 'Open in Ambra mobile on this phone'); link.id = 'pairLink';
