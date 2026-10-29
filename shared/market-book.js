@@ -175,11 +175,12 @@ export function invertBook(book) {
 
 // What the wallet holds of each asset, one figure as the wallet shows it: its `total` where it
 // answers one (getCapabilities' 'balances-total'), else its coins on the chain and its leaves
-// (getBalances' `leaves`), and BTC on the chain.
+// (getBalances' `leaves`), and BTC on the chain and on the Bitcoin ark where the wallet answers
+// that apart (`btc_ark`, Ambra mobile).
 export function spendableOf(b) {
   if (b && b.total && typeof b.total === 'object') return { ...b.total };
   const out = {};
-  if (b && b.btc != null) out.BTC = String(b.btc);
+  if (b && (b.btc != null || b.btc_ark != null)) { try { out.BTC = (BigInt(b.btc || 0) + BigInt(b.btc_ark || 0)).toString(); } catch {} }
   for (const part of [b && b.assets, b && b.leaves]) {
     for (const [h, v] of Object.entries(part || {})) {
       try { out[h] = (BigInt(out[h] || 0) + BigInt(v || 0)).toString(); } catch {}

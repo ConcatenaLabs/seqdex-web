@@ -41,7 +41,7 @@ export const CHANNEL = 'sequentia-wallet';
 export const PAIR_RELAYS = ['wss://relay.primal.net', 'wss://relay.damus.io'];
 export const PAIR_PROTOCOL = 'sequentia-provider-1';
 // How long a request waits: a read, and one the wallet's owner must approve.
-export const READ_MS = 20000;
+export const READ_MS = 30000;   // a phone's wallet can take ten seconds to read its balances
 export const APPROVAL_MS = 10 * 60 * 1000;   // the wallet prices first, then its owner decides
 const SILENT = new Set(['getCapabilities', 'getWalletMode', 'getAccounts', 'getBalances', 'getOrders', 'getNetwork']);
 const rid = () => Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2);
