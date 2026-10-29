@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RANGES, rangeOf, fillCandles, priceFormat, barsOf, closesOf, depthSeries, niceStep, sparkSvg, CHART_NOTICE } from '../shared/chart.js';
+import { RANGES, rangeOf, fillCandles, padFlat, priceFormat, barsOf, closesOf, depthSeries, niceStep, sparkSvg, CHART_NOTICE } from '../shared/chart.js';
 
 test("the first three ranges are the wallets' own", () => {
   // sequentia-web-wallet market-view.js RANGES
@@ -80,4 +80,13 @@ test('an interval with no trade holds the last price, so empty days keep their p
   assert.equal(fillCandles(cs, H, -10 * H, H)[0].t, 0);
   assert.deepEqual(fillCandles([], H, 0, H), []);
   assert.equal(fillCandles(cs, 60, 0, 1e9, 100).length, 100);
+});
+
+test('a flat price keeps a readable scale, a moving one its own', () => {
+  const flat = padFlat({ priceRange: { minValue: 100, maxValue: 100 } });
+  assert.deepEqual(flat.priceRange, { minValue: 99, maxValue: 101 });
+  const moving = { priceRange: { minValue: 90, maxValue: 110 } };
+  assert.equal(padFlat(moving), moving);
+  assert.equal(padFlat(null), null);
+  assert.deepEqual(padFlat({ priceRange: { minValue: 0, maxValue: 0 } }).priceRange, { minValue: -1, maxValue: 1 });
 });

@@ -130,6 +130,17 @@ export function sparkSvg(points, { w = 120, h = 30 } = {}) {
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline fill="none" stroke="${col}" stroke-width="1.5" points="${xy}"/></svg>`;
 }
 
+// A flat or nearly flat price keeps a readable scale: 1% either side of it.
+export function padFlat(range) {
+  const r = range && range.priceRange;
+  if (!r) return range;
+  const { minValue: lo, maxValue: hi } = r, mid = (lo + hi) / 2;
+  if (hi - lo > Math.abs(mid) * 0.002) return range;
+  const d = Math.abs(mid) * 0.01 || 1;
+  return { ...range, priceRange: { minValue: mid - d, maxValue: mid + d } };
+}
+const autoscaleInfoProvider = (orig) => padFlat(orig());
+
 function baseOptions(extra = {}) {
   return {
     autoSize: true,
@@ -157,9 +168,9 @@ function baseOptions(extra = {}) {
 export function createPriceChart(LW, el, { type = 'candles', indicators } = {}) {
   const chart = LW.createChart(el, baseOptions());
   const shown = new Set(indicators || INDICATORS.filter((i) => i.on).map((i) => i.key));
-  let kind = type, candles = [], now = 0;
-  const candle = chart.addSeries(LW.CandlestickSeries, { upColor: COLORS.buy, downColor: COLORS.sell, borderVisible: false, wickUpColor: COLORS.buy, wickDownColor: COLORS.sell });
-  const line = chart.addSeries(LW.LineSeries, { color: COLORS.line, lineWidth: 2, lineType: LW.LineType.WithSteps, visible: false });
+  let kind = type, candles = [], now = 0, fitKey = null;
+  const candle = chart.addSeries(LW.CandlestickSeries, { upColor: COLORS.buy, downColor: COLORS.sell, borderVisible: false, wickUpColor: COLORS.buy, wickDownColor: COLORS.sell, autoscaleInfoProvider });
+  const line = chart.addSeries(LW.LineSeries, { color: COLORS.line, lineWidth: 2, lineType: LW.LineType.WithSteps, visible: false, autoscaleInfoProvider });
   let volume = null;
   let lines = [];      // indicator series drawn now
   const byTime = new Map();
@@ -194,7 +205,9 @@ export function createPriceChart(LW, el, { type = 'candles', indicators } = {}) 
     byTime.clear();
     for (const c of candles) byTime.set(c.t, c);
     drawIndicators();
-    chart.timeScale().fitContent();
+    // Fit the view to the range when it changes, not at every repaint, so a zoom holds.
+    const key = candles.length ? candles[0].t + ':' + candles.length : '';
+    if (key !== fitKey) { fitKey = key; chart.timeScale().fitContent(); }
   }
   return {
     chart,
