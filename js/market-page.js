@@ -102,7 +102,7 @@ export async function runMarketPage() {
     const list = pairsOf({
       chainMarkets: [...chain, ...extra.filter((m) => m.quote !== 'BTC' && m.base !== 'BTC')],
       instantMarkets: [...instant, ...extra.filter((m) => m.quote === 'BTC' || m.base === 'BTC')],
-      refPrice: priceUsd, tickerOf: tk,
+      tickerOf: tk,
     });
     if (!list.length && !pairs.length) {
       $('pairList').textContent = '';

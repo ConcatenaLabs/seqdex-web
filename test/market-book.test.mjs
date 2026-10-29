@@ -3,23 +3,38 @@ import assert from 'node:assert/strict';
 import { orient, pairsOf, mergeBook, rowOf, remaindersOf, seriesOf, priceAtoms, amountAtoms, estimate, marketPrice, PRICE_WORDS } from '../shared/market-book.js';
 
 const G = 'aa'.repeat(32), U = 'bb'.repeat(32), S = 'cc'.repeat(32);
-const price = { [G]: 4146, [U]: 1, [S]: 0.37 };
 const tick = { [G]: 'GOLD', [U]: 'USDX', [S]: 'tSEQ', BTC: 'BTC' };
-const refPrice = (h) => price[h] ?? null, tickerOf = (h) => tick[h] || h;
+const tickerOf = (h) => tick[h] || h;
 
-test('a pair has one orientation: BTC quotes, else the asset worth less per unit', () => {
-  assert.deepEqual(orient(U, G, refPrice, tickerOf), { base: G, quote: U });
-  assert.deepEqual(orient('BTC', G, refPrice, tickerOf), { base: G, quote: 'BTC' });
-  assert.deepEqual(orient('dd'.repeat(32), 'ee'.repeat(32), () => null, (h) => (h[0] === 'd' ? 'ZED' : 'ABC')), { base: 'ee'.repeat(32), quote: 'dd'.repeat(32) });
+test("a pair has the wallets' one orientation: BTC, then the fiat stablecoins, quote", () => {
+  assert.deepEqual(orient(U, G, tickerOf), { base: G, quote: U });
+  assert.deepEqual(orient('BTC', G, tickerOf), { base: G, quote: 'BTC' });
+  assert.deepEqual(orient(U, 'BTC', tickerOf), { base: U, quote: 'BTC' });
+  // The Sequence token is one asset among equals: USDX quotes it, as it quotes GOLD.
+  assert.deepEqual(orient(S, U, tickerOf), { base: S, quote: U });
+  // EURX quotes everything but BTC and USDX.
+  const E = 'ee'.repeat(32);
+  const t2 = (h) => (h === E ? 'EURX' : tickerOf(h));
+  assert.deepEqual(orient(E, G, t2), { base: G, quote: E });
+  assert.deepEqual(orient(E, U, t2), { base: E, quote: U });
+  // The bridged stablecoins quote too: tSEQ / USDC.e, GOLD / EURC.e.
+  const C = '11'.repeat(32), D = '12'.repeat(32);
+  const t3 = (h) => (h === C ? 'USDC.e' : h === D ? 'EURC.e' : tickerOf(h));
+  assert.deepEqual(orient(C, S, t3), { base: S, quote: C });
+  assert.deepEqual(orient(D, G, t3), { base: G, quote: D });
+  assert.deepEqual(orient(C, U, t3), { base: C, quote: U });
+  // Two other assets: the id that sorts first is the base, whatever their prices.
+  assert.deepEqual(orient(S, G, tickerOf), { base: G, quote: S });
+  assert.deepEqual(orient(G, S, tickerOf), { base: G, quote: S });
 });
 
 test('each pair is listed once, BTC pairs first, interactive-only and confidential markets aside', () => {
   const pairs = pairsOf({
     chainMarkets: [{ base: G, quote: U }, { base: U, quote: G }, { base: S, quote: U }, { base: G, quote: 'BTC' }, { base: G, quote: S, confidential: true }],
     instantMarkets: [{ base: G, quote: 'BTC' }, { base: G, quote: U }],
-    refPrice, tickerOf,
+    tickerOf,
   });
-  assert.deepEqual(pairs.map((p) => tickerOf(p.base) + '/' + tickerOf(p.quote)), ['GOLD/BTC', 'GOLD/USDX', 'USDX/tSEQ']);
+  assert.deepEqual(pairs.map((p) => tickerOf(p.base) + '/' + tickerOf(p.quote)), ['GOLD/BTC', 'GOLD/USDX', 'tSEQ/USDX']);
 });
 
 const cov = (sell, want, locked, num, den, extra = {}) => ({

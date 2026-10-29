@@ -22,8 +22,11 @@ the site's override says otherwise (`?view=developer|default|wallet`, kept in th
 browser).
 
 - **Pairs.** Each pair is listed once, whichever way round its orders were listed:
-  BTC is always the quote, otherwise the asset worth less per unit is the quote, so
-  a price reads as one number above one. BTC pairs come first. The list is the
+  the quote is the pair's unit of account, BTC first, then the fiat stablecoins
+  (USDX, then EURX, then the bridged ones); between two other assets, the one whose id sorts first is the
+  base. This is the wallets' rule (`sequentia-web-wallet` `swap.js`,
+  `canonicalPair`), which the makers post in too, so a pair reads one way on every
+  surface. BTC pairs come first. The list is the
   on-chain book's markets and the pure-Lightning book's BTC markets, plus the pairs
   of what the connected wallet holds (with each other and with BTC) and the pair a
   link names (`?pair=GOLD-USDX`), so the first order of a new market can be placed.

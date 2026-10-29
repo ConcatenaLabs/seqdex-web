@@ -21,25 +21,31 @@ import { poolRowOf } from './pool-room.js';
 
 const big = (v) => BigInt(v ?? 0);
 
-// The orientation of a pair: BTC is always the quote; otherwise the asset worth less
-// per unit is the quote, so a price reads as one number above one; with no prices
-// known, the tickers decide. Returns { base, quote }.
-export function orient(a, b, refPrice = () => null, tickerOf = (h) => h) {
-  if (a === 'BTC') return { base: b, quote: a };
-  if (b === 'BTC') return { base: a, quote: b };
-  const pa = refPrice(a), pb = refPrice(b);
-  if (pa > 0 && pb > 0 && pa !== pb) return pa > pb ? { base: a, quote: b } : { base: b, quote: a };
-  return String(tickerOf(a)) <= String(tickerOf(b)) ? { base: a, quote: b } : { base: b, quote: a };
+// The orientation of a pair, the same as the wallets' (sequentia-web-wallet swap.js
+// `canonicalPair`), so a pair reads one way on every surface: the quote is the
+// pair's unit of account, BTC first, then the fiat stablecoins in QUOTE_RANK's
+// order; between two other assets, the one whose id sorts first is the base. The
+// Sequence token is one of those other assets. Returns { base, quote }. The
+// relay's makers post in this direction too.
+export const QUOTE_RANK = Object.freeze({ USDX: 900, EURX: 890, 'EURC.E': 885, FEEUSD: 880, USDT: 870, USDC: 865, 'USDC.E': 864, USD: 860 });
+export function quoteRank(h, tickerOf = (x) => x) {
+  if (h === 'BTC') return 1000;
+  return QUOTE_RANK[String(tickerOf(h) || '').toUpperCase()] || 400;
+}
+export function orient(a, b, tickerOf = (h) => h) {
+  const ra = quoteRank(a, tickerOf), rb = quoteRank(b, tickerOf);
+  if (ra !== rb) return ra > rb ? { base: b, quote: a } : { base: a, quote: b };
+  return String(a) < String(b) ? { base: a, quote: b } : { base: b, quote: a };
 }
 
 // The pairs of the default view, each once, from the relays' market lists: every
 // Sequentia pair of the on-chain book, and every pair against BTC the instant makers
 // quote. BTC pairs come first, then the rest by ticker.
-export function pairsOf({ chainMarkets = [], instantMarkets = [], refPrice, tickerOf }) {
+export function pairsOf({ chainMarkets = [], instantMarkets = [], tickerOf }) {
   const seen = new Map();
   const add = (a, b) => {
     if (!a || !b || a === b) return;
-    const p = orient(a, b, refPrice, tickerOf);
+    const p = orient(a, b, tickerOf);
     const k = p.base + '/' + p.quote;
     if (!seen.has(k)) seen.set(k, { ...p, key: k });
   };
