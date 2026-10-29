@@ -128,3 +128,13 @@ test('a market order read from the quote: the base it gets or gives, walking the
   // Both ways round agree on a level boundary.
   assert.equal(estimate(book, 'buy', 3n).quote, estimateQuote(book, 'buy', 12100n).quote);
 });
+
+test('a smallest fill typed in the shown base becomes the canonical base, at the price when inverted', async () => {
+  const { minFillAtoms } = await import('../shared/market-book.js');
+  assert.equal(minFillAtoms(25000000n, false, 4000n * 10n ** 8n, 8), 25000000n);
+  // Shown XTEST / YUSD, canonical YUSD / XTEST at 0.5 XTEST per YUSD: 1 XTEST is 2 YUSD.
+  assert.equal(minFillAtoms(10n ** 8n, true, 5n * 10n ** 7n, 8), 2n * 10n ** 8n);
+  // Rounded up: never a fill smaller than asked.
+  assert.equal(minFillAtoms(1n, true, 3n * 10n ** 8n, 8), 1n);
+  assert.throws(() => minFillAtoms(1n, true, 0n, 8), /price above zero/);
+});
