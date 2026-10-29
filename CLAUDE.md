@@ -63,7 +63,9 @@ covenant orders and resting orders), and the pools room's reading of pools and
 clearing rounds (`shared/pool-room.js`, both orientations of a pool's two sides),
 the wallet connectors (`shared/connectors.js`: rail groups, sessions), and the
 charts (`shared/chart.js`: ranges, filled candles, depth sampling, the seven-day
-line) and their indicators (`shared/indicators.js`).
+line) and their indicators (`shared/indicators.js`), and the Tickers panel's
+rows (`shared/tickers.js`: each market both ways round, grouped by base, an
+anchor, search).
 End to end, each with the extension and a relay on a private chain, the extension's
 `test/market/drive.mjs` drives the default view and its `test/leaf-room/drive.mjs`
 the leaves room, and its `test/resting/drive.mjs` orders resting in the operator's
