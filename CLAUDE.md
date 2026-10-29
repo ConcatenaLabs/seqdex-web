@@ -44,6 +44,10 @@ contract (surfaces, books, settlement phases, provider dependencies).
 - LNDEX = pure LN only. Submarine offers (ln_direction 0/1) and sub-asset
   offers (4/5) are the web wallet's business, never shown here.
 - Confidential DEX never gets a BTC leg (Bitcoin has no CT).
+- Charts go through `shared/chart.js` and the vendored Lightweight Charts
+  (`vendor/lightweight-charts`, never edited; a new version replaces the file and
+  its README's version and hash). A page that shows a chart shows `CHART_NOTICE`
+  with its link, and the attribution logo stays on.
 - Static ES modules, no bundler. Surface accents are informational
   (violet LN, gold chain, teal confidential, lime leaves); the default view
   settles every way at once and wears a neutral blue. Keep them consistent.
@@ -57,7 +61,9 @@ the merged book, the chart's series, typed amounts; `shared/market-book.js`) and
 leaves room's reading of the relay's book and fill records (`shared/leaf-room.js`,
 covenant orders and resting orders), and the pools room's reading of pools and
 clearing rounds (`shared/pool-room.js`, both orientations of a pool's two sides),
-and the wallet connectors (`shared/connectors.js`: rail groups, sessions).
+the wallet connectors (`shared/connectors.js`: rail groups, sessions), and the
+charts (`shared/chart.js`: ranges, filled candles, depth sampling, the seven-day
+line) and their indicators (`shared/indicators.js`).
 End to end, each with the extension and a relay on a private chain, the extension's
 `test/market/drive.mjs` drives the default view and its `test/leaf-room/drive.mjs`
 the leaves room, and its `test/resting/drive.mjs` orders resting in the operator's
