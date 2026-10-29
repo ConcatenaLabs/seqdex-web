@@ -146,6 +146,19 @@ export function amountAtoms(str, basePrec) {
   return v;
 }
 
+// A smallest fill typed in the base of the pair as shown, as the canonical order's base atoms.
+// When the view is the canonical market inverted, what is typed is the canonical quote: it
+// becomes the canonical base it buys at the order's price (quote atoms per whole canonical
+// base), rounded up so no fill is smaller than asked.
+export function minFillAtoms(typedAtoms, inverted, priceAtoms, canonBasePrec) {
+  const a = BigInt(typedAtoms);
+  if (!inverted) return a;
+  const p = BigInt(priceAtoms);
+  if (p <= 0n) throw new Error('enter a price above zero');
+  const unit = 10n ** BigInt(canonBasePrec);
+  return (a * unit + p - 1n) / p;
+}
+
 // What a market order of `amount` base atoms would take from the book, for the form's
 // estimate only (the wallet plans the trade itself): base atoms it reaches and the quote
 // atoms they cost, walking levels from the best.

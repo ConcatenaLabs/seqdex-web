@@ -7,7 +7,7 @@
 import { $, el, developerView } from '../shared/app.js';
 import { assetMeta, assetByTicker, usdFor, priceUsd } from '../shared/meta.js';
 import { MOUNTS } from '../shared/book.js';
-import { orient, mergeBook, invertBook, remaindersOf, priceAtoms, amountAtoms, estimate, estimateQuote } from '../shared/market-book.js';
+import { orient, mergeBook, invertBook, remaindersOf, priceAtoms, amountAtoms, minFillAtoms, estimate, estimateQuote } from '../shared/market-book.js';
 import * as P from '../shared/provider.js';
 import * as LW from '../shared/vendor/lightweight-charts/lightweight-charts.standalone.production.mjs';
 import { createPriceChart, createDepthChart, RANGES, rangeOf } from '../shared/chart.js';
@@ -477,7 +477,7 @@ export function mountPair(root, life) {
     if (features.has('order-min-fill')) {
       const l = el('label', 't-opt'); l.appendChild(el('span', null, 'Smallest fill'));
       const i = el('input'); i.type = 'text'; i.id = 'optMinFill'; i.inputMode = 'decimal'; i.placeholder = '0'; i.style.width = '90px';
-      l.appendChild(i); l.appendChild(el('span', 'faint', tk(canon.base))); d.appendChild(l);
+      l.appendChild(i); l.appendChild(el('span', 'faint', tk(view.base))); d.appendChild(l);
     }
     if (features.has('order-take-back-after')) {
       const l = el('label', 't-opt'); const t = el('span', null, 'Can take back after');
@@ -582,7 +582,7 @@ export function mountPair(root, life) {
       if (type === 'limit') {
         if ($('optPostOnly') && $('optPostOnly').checked) params.post_only = true;
         if ($('optNoRest') && $('optNoRest').checked) params.rest = false;
-        if ($('optMinFill') && $('optMinFill').value) params.min_fill = amountAtoms($('optMinFill').value, prec(canon.base)).toString();
+        if ($('optMinFill') && $('optMinFill').value) params.min_fill = minFillAtoms(amountAtoms($('optMinFill').value, prec(view.base)), inv, o.price, prec(canon.base)).toString();
         if ($('optTakeBack') && $('optTakeBack').value) params.take_back_after = Number($('optTakeBack').value);
       }
     } catch (e) { st.className = 'status err'; st.textContent = e.message; return; }
