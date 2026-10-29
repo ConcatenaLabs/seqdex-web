@@ -297,3 +297,17 @@ default view settles every way at once and wears a neutral blue. Type: Space
 Grotesk for display and UI, IBM Plex Mono for numbers, books, and
 identifiers. The accent system is informational, not decorative: it encodes
 which settlement world the user is standing in.
+
+Charts are drawn with TradingView Lightweight Charts, vendored unmodified in
+`vendor/lightweight-charts` (Apache-2.0; a page that shows a chart shows its
+NOTICE with a link to TradingView, and each chart keeps the library's
+attribution logo). `shared/chart.js` holds the price chart (candles or a step
+line, with volume and indicators in panes of their own), the depth chart (the
+library's price-axis chart, the book sampled at even price steps), the ranges
+(1D, 1W and 1M as the wallets have them, then 3M, 1Y and All), a seven-day line
+for lists, and the colours: buys green, sales amber, as in the wallets. An
+interval with no trade holds the last price, so a quiet market's empty days keep
+their place on the time axis. `shared/indicators.js` computes moving averages,
+EMA, Bollinger bands, VWAP and RSI from the relay's candles. The library is
+passed in rather than imported, so a wallet draws the same charts from its own
+copy of the one file.
