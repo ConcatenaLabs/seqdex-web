@@ -7,7 +7,7 @@
 import { $, el, developerView } from '../shared/app.js';
 import { assetMeta, assetByTicker, usdFor, priceUsd } from '../shared/meta.js';
 import { MOUNTS } from '../shared/book.js';
-import { orient, mergeBook, invertBook, remaindersOf, priceAtoms, amountAtoms, estimate } from '../shared/market-book.js';
+import { orient, mergeBook, invertBook, remaindersOf, priceAtoms, amountAtoms, estimate, estimateQuote } from '../shared/market-book.js';
 import * as P from '../shared/provider.js';
 import * as LW from '../shared/vendor/lightweight-charts/lightweight-charts.standalone.production.mjs';
 import { createPriceChart, createDepthChart, RANGES, rangeOf } from '../shared/chart.js';
@@ -306,7 +306,7 @@ export function mountPair(root, life) {
     book = inv ? invertBook(canonBook) : canonBook;
     paintBook();
     if (viewMode === 'depth') drawDepth();
-    paintEstimate();
+    tether();
   }
   function stepsFor(p) {
     if (!(p > 0)) return [];
@@ -345,7 +345,7 @@ export function mountPair(root, life) {
       r.appendChild(el('span', null, u != null ? '$' + fmtUsd(u) : units(l.total, view.quote)));
       const bar = el('i', 'bar'); bar.style.width = (Number(depth) / max * 100).toFixed(1) + '%'; r.appendChild(bar);
       r.title = l.orders + (l.orders === 1 ? ' order' : ' orders');
-      r.onclick = () => { if (type !== 'market' && $('fPrice')) { $('fPrice').value = String(+l.price.toPrecision(10)); paintEstimate(); } };
+      r.onclick = () => { if (type !== 'market' && $('fPrice')) { $('fPrice').value = String(+l.price.toPrecision(10)); tether(); } };
       return r;
     };
     $('asks').textContent = ''; $('bids').textContent = '';
@@ -395,11 +395,14 @@ export function mountPair(root, life) {
     if (dev !== was && view) { drawRoutes(); paintTrades(lastTrades); if (!dev) refreshBook(); }
   }
 
-  // ---- the order ticket ----
-  // What the ticket's amount is in: the shown base, or, for a pair shown the other way
-  // round from its market, the shown quote (what is spent on a buy, received on a sale),
-  // so every amount the wallet is asked for is exact.
-  const amountAsset = () => (inv ? view.quote : view.base);
+  // ---- the order ticket: You pay and You receive, tethered ----
+  // A buy pays the shown quote and receives the shown base; a sale the other way round. The
+  // amount typed stays as typed; the other follows, at the limit price for a limit and by
+  // walking the book for a market order. The order goes to the wallet in the market's own
+  // direction, whichever way round the pair is shown.
+  let fixed = 'pay';
+  const payAsset = () => (side === 'buy' ? view.quote : view.base);
+  const recvAsset = () => (side === 'buy' ? view.base : view.quote);
   function renderForm() {
     const box = $('orderForm'); box.textContent = '';
     const sides = el('div', 't-sides');
@@ -422,12 +425,12 @@ export function mountPair(root, life) {
     }
     box.appendChild(types);
     if (type === 'auction') box.appendChild(el('p', 't-small', 'Trades at the next auction\'s one price, at your limit or better.'));
-    const field = (id, label, hint, unitText) => {
+    const field = (id, label, hint, unitText, onInput = tether) => {
       const f = el('label', 't-fld'); f.htmlFor = id;
       const k = el('span', 'k t-k', label); if (hint) k.appendChild(el('em', null, hint)); f.appendChild(k);
       const v = el('span', 'v');
       const i = el('input'); i.id = id; i.type = 'text'; i.inputMode = 'decimal'; i.autocomplete = 'off'; i.spellcheck = false;
-      i.addEventListener('input', paintEstimate);
+      i.addEventListener('input', onInput);
       v.appendChild(i); v.appendChild(el('small', null, unitText)); f.appendChild(v);
       box.appendChild(f);
       return i;
@@ -437,15 +440,16 @@ export function mountPair(root, life) {
       const best = side === 'buy' ? book && book.best.bid : book && book.best.ask;
       if (best != null) p.value = String(+best.toPrecision(10));
     }
-    field('fAmount', inv ? (side === 'buy' ? 'You spend' : 'You receive') : 'Amount', '', tk(amountAsset()));
+    field('fPay', 'You pay', '', tk(payAsset()), () => { fixed = 'pay'; tether(); });
     const pcts = el('div', 't-pcts');
     for (const f of [0.25, 0.5, 0.75, 1]) {
       const b = el('button', null, f === 1 ? 'Max' : f * 100 + '%'); b.type = 'button';
-      b.onclick = () => { const v = maxAmount(); if (v > 0) { $('fAmount').value = String(+(v * f).toFixed(prec(amountAsset()))); paintEstimate(); } };
+      b.onclick = () => { const v = maxPay(); if (v > 0) { $('fPay').value = String(+(v * f).toFixed(prec(payAsset()))); fixed = 'pay'; tether(); } };
       pcts.appendChild(b);
     }
     box.appendChild(pcts);
     const bal = el('div', 't-bal'); bal.id = 'fBal'; box.appendChild(bal);
+    field('fReceive', 'You receive', '', tk(recvAsset()), () => { fixed = 'receive'; tether(); });
     if (type === 'limit') renderOptions(box);
     const est = el('div', 't-est'); est.id = 'fEstimate'; box.appendChild(est);
     const go = el('button', 't-go ' + side); go.type = 'button'; go.id = 'fGo';
@@ -454,7 +458,7 @@ export function mountPair(root, life) {
     const st = el('div', 'status'); st.id = 'fStatus'; st.setAttribute('role', 'status'); st.setAttribute('aria-live', 'polite');
     box.appendChild(st);
     go.onclick = submit;
-    paintBalance(); paintEstimate();
+    paintBalance(); tether();
   }
   // The limit options the wallet offers (getCapabilities' features); none is drawn otherwise.
   function renderOptions(box) {
@@ -466,14 +470,14 @@ export function mountPair(root, life) {
     d.appendChild(el('summary', null, 'Options'));
     for (const [id, label, hint] of opts) {
       const l = el('label', 't-opt'); const c = el('input'); c.type = 'checkbox'; c.id = id;
-      c.onchange = () => { if (c.checked) for (const o of ['optPostOnly', 'optNoRest']) if (o !== id && $(o)) $(o).checked = false; paintEstimate(); };
+      c.onchange = () => { if (c.checked) for (const o of ['optPostOnly', 'optNoRest']) if (o !== id && $(o)) $(o).checked = false; tether(); };
       const t = el('span', null, label); t.appendChild(el('small', null, hint));
       l.appendChild(c); l.appendChild(t); d.appendChild(l);
     }
     if (features.has('order-min-fill')) {
       const l = el('label', 't-opt'); l.appendChild(el('span', null, 'Smallest fill'));
       const i = el('input'); i.type = 'text'; i.id = 'optMinFill'; i.inputMode = 'decimal'; i.placeholder = '0'; i.style.width = '90px';
-      l.appendChild(i); l.appendChild(el('span', 'faint', tk(amountAsset()))); d.appendChild(l);
+      l.appendChild(i); l.appendChild(el('span', 'faint', tk(canon.base))); d.appendChild(l);
     }
     if (features.has('order-take-back-after')) {
       const l = el('label', 't-opt'); const t = el('span', null, 'Can take back after');
@@ -484,14 +488,39 @@ export function mountPair(root, life) {
     }
     box.appendChild(d);
   }
-  // What the ticket can spend, in the ticket's amount asset: what the wallet's trades can pay
-  // from now (getBalances' `spendable`) where it says, else what it holds.
-  function maxAmount() {
+  // What You pay can take, in its own units: what the wallet's trades can pay from now
+  // (getBalances' `spendable`) where it says, else what it holds.
+  function maxPay() {
     const pool = state.spendable || balances;
-    const has = (h) => Number(pool[h] || 0) / Math.pow(10, prec(h));
-    const px = Number($('fPrice') && $('fPrice').value) || (side === 'buy' ? book && book.best.ask : book && book.best.bid) || 0;
-    if (!inv) return side === 'buy' ? (px > 0 ? has(view.quote) / px : 0) : has(view.base);
-    return side === 'buy' ? has(view.quote) : has(view.base) * px;
+    return Number(pool[payAsset()] || 0) / Math.pow(10, prec(payAsset()));
+  }
+  // Both amounts in the pair as shown, from the one typed: { base, quote } in atoms (null where
+  // the book cannot say yet) and `short`, what the book fills when less than asked.
+  function amounts() {
+    const typedAsset = fixed === 'pay' ? payAsset() : recvAsset();
+    const typed = amountAtoms($(fixed === 'pay' ? 'fPay' : 'fReceive').value, prec(typedAsset));
+    const isBase = typedAsset === view.base;
+    if (type !== 'market') {
+      const pA = priceAtoms($('fPrice').value.trim(), prec(view.quote));
+      const one = 10n ** BigInt(prec(view.base));
+      return isBase ? { base: typed, quote: (typed * pA) / one, short: null } : { base: (typed * one) / pA, quote: typed, short: null };
+    }
+    if (!book) return isBase ? { base: typed, quote: null, short: null } : { base: null, quote: typed, short: null };
+    if (isBase) { const r = estimate(book, side, typed); return { base: typed, quote: r.quote, short: r.short ? r : null }; }
+    const r = estimateQuote(book, side, typed);
+    return { base: r.base, quote: typed, short: r.short ? r : null };
+  }
+  // The other amount follows the one typed.
+  function tether() {
+    if (!$('fPay')) return;
+    let a = null;
+    try { a = amounts(); } catch { /* not a number yet */ }
+    const otherId = fixed === 'pay' ? 'fReceive' : 'fPay';
+    const otherAsset = fixed === 'pay' ? recvAsset() : payAsset();
+    const v = a ? (otherAsset === view.base ? a.base : a.quote) : null;
+    const o = $(otherId);
+    if (o && document.activeElement !== o) o.value = v != null && v > 0n ? units(v, otherAsset).replace(/,/g, '') : '';
+    paintEstimate(a);
   }
   function paintBalance() {
     const b = $('fBal'); if (!b) return;
@@ -505,7 +534,9 @@ export function mountPair(root, life) {
   // atoms), price (quote atoms per whole base, or null) }; throws on a bad entry.
   function canonOrder() {
     const cs = inv ? (side === 'buy' ? 'sell' : 'buy') : side;
-    const amount = amountAtoms($('fAmount').value, prec(canon.base));
+    const a = amounts();
+    const amount = inv ? a.quote : a.base;
+    if (amount == null || amount <= 0n) throw new Error('enter how much you pay or receive');
     let price = null;
     if (type !== 'market') {
       const p = Number($('fPrice').value);
@@ -514,25 +545,19 @@ export function mountPair(root, life) {
     }
     return { side: cs, amount, price };
   }
-  function paintEstimate() {
+  function paintEstimate(a) {
     const box = $('fEstimate'), go = $('fGo');
     if (!box || !view) return;
     box.textContent = '';
     go.textContent = (side === 'buy' ? 'Buy ' : 'Sell ') + tk(view.base);
+    const amt = (atoms, h) => units(atoms, h) + ' ' + tk(h);
+    if (a && a.base > 0n) go.textContent = (side === 'buy' ? 'Buy ' : 'Sell ') + amt(a.base, view.base);
+    if (a && a.short) box.appendChild(el('div', 'faint', 'The book can fill up to ' + amt(a.short.base, view.base) + ' now.'));
     let o;
     try { o = canonOrder(); } catch { return; }
     const line = (k, v) => { const d = el('div'); d.appendChild(el('span', null, k)); d.appendChild(el('span', null, v)); box.appendChild(d); };
-    const amt = (atoms, h) => units(atoms, h) + ' ' + tk(h);
-    const payGet = (r, cs) => (cs === 'buy' ? [[r.quote, canon.quote], [r.base, canon.base]] : [[r.base, canon.base], [r.quote, canon.quote]]);
-    if (!inv) go.textContent = (side === 'buy' ? 'Buy ' : 'Sell ') + units(o.amount, view.base) + ' ' + tk(view.base);
-    if (!canonBook) return;
-    if (type === 'market') {
-      const r = estimate(canonBook, o.side, o.amount);
-      if (r.base === 0n) { line('The book', 'Nobody is ' + (o.side === 'buy' ? 'selling' : 'buying') + ' right now'); return; }
-      const [pay, get] = payGet(r, o.side);
-      line('You pay about', amt(pay[0], pay[1]));
-      line('You get about', amt(get[0], get[1]));
-      if (r.short) line('The book holds', 'only this much now');
+    if (!canonBook || type === 'market') {
+      if (book && type === 'market' && !(side === 'buy' ? book.asks : book.bids).length) line('The book', 'Nobody is ' + (side === 'buy' ? 'selling' : 'buying') + ' right now');
       return;
     }
     // A limit: what fills now at the price or better, and what rests.
@@ -543,7 +568,7 @@ export function mountPair(root, life) {
     if (r.base > 0n) line('Fills now', amt(r.base, canon.base));
     if (rest > 0n && !($('optNoRest') && $('optNoRest').checked)) line('Rests on the book', amt(rest, canon.base));
     const total = (o.amount * o.price) / 10n ** BigInt(prec(canon.base));
-    line(o.side === 'buy' ? 'You pay at most' : 'You get at least', amt(total, canon.quote));
+    line(o.side === 'buy' ? 'You pay at most' : 'You receive at least', amt(total, canon.quote));
   }
   async function submit() {
     const st = $('fStatus'), go = $('fGo');
@@ -575,14 +600,14 @@ export function mountPair(root, life) {
       if (r.order_error) parts.push('The rest was not placed: ' + r.order_error + '.');
       if (r.failed && r.failed.length) parts.push(r.failed.length + ' order' + (r.failed.length === 1 ? ' was' : 's were') + ' taken by someone else first; nothing of yours moved for ' + (r.failed.length === 1 ? 'it' : 'them') + '.');
       st.textContent = parts.join(' ') + ' Follow it under Your orders.';
-      $('fAmount').value = '';
+      $('fPay').value = ''; $('fReceive').value = '';
       closeSheet();
       refresh(); refreshBook();
     } catch (e) {
       st.className = 'status err';
       const m = (e && e.message) || String(e);
       st.textContent = /reject|declin|denied/i.test(m) ? 'You declined in the wallet. Nothing was traded.' : m;
-    } finally { busy = false; go.disabled = false; paintEstimate(); }
+    } finally { busy = false; go.disabled = false; tether(); }
   }
 
   // ---- the phone: the ticket opens as a sheet from Buy or Sell ----

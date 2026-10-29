@@ -188,3 +188,19 @@ export function spendableOf(b) {
   }
   return out;
 }
+
+// The other way round from `estimate`: the base a market order gets for paying (a buy) or must
+// give to receive (a sale) `quoteAtoms` of the quote, walking the levels from the best.
+// -> { base, quote, short } in atoms, short when the book holds less than asked.
+export function estimateQuote(book, side, quoteAtoms) {
+  const levels = side === 'buy' ? book.asks : book.bids;
+  let left = BigInt(quoteAtoms ?? 0), base = 0n, quote = 0n;
+  for (const l of levels) {
+    if (left <= 0n) break;
+    const take = left < l.total ? left : l.total;
+    base += (l.size * take) / l.total;
+    quote += take;
+    left -= take;
+  }
+  return { base, quote, short: left > 0n };
+}

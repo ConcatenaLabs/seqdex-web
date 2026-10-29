@@ -116,3 +116,15 @@ test('a book read the other way round: asks become bids at the inverse price, si
   assert.deepEqual(spendableOf({ btc: '7', assets: { a: '1' }, leaves: { a: '2' } }), { BTC: '7', a: '3' });
   assert.deepEqual(spendableOf({ btc: '7', btc_ark: '3', assets: {}, leaves: { a: '2' } }), { BTC: '10', a: '2' });
 });
+
+test('a market order read from the quote: the base it gets or gives, walking the levels', async () => {
+  const { estimateQuote, estimate } = await import('../shared/market-book.js');
+  const book = { asks: [{ price: 4000, size: 2n, total: 8000n }, { price: 4100, size: 1n, total: 4100n }],
+    bids: [{ price: 3900, size: 3n, total: 11700n }] };
+  assert.deepEqual(estimateQuote(book, 'buy', 8000n), { base: 2n, quote: 8000n, short: false });
+  assert.deepEqual(estimateQuote(book, 'buy', 12100n), { base: 3n, quote: 12100n, short: false });
+  assert.deepEqual(estimateQuote(book, 'buy', 20000n), { base: 3n, quote: 12100n, short: true });
+  assert.deepEqual(estimateQuote(book, 'sell', 3900n), { base: 1n, quote: 3900n, short: false });
+  // Both ways round agree on a level boundary.
+  assert.equal(estimate(book, 'buy', 3n).quote, estimateQuote(book, 'buy', 12100n).quote);
+});
