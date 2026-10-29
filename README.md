@@ -2,8 +2,13 @@
 
 The standalone SeqDEX website for the Sequentia testnet, live at
 https://sequentiatestnet.com/dex/. Non-custodial by construction: it has no
-wallet of its own and drives everything through the Ambra browser extension
-(repo `sequentia-extension`, `window.sequentia`).
+wallet of its own and drives everything through the wallet you connect: the
+Sequentia browser extension (repo `sequentia-extension`, `window.sequentia`), or
+your own Sequentia Core, Lightning node and leaf wallet through the
+[`sequentia-connect`](https://github.com/ConcatenaLabs/sequentia-connect) daemon on
+your computer, which asks you in its terminal before anything is signed. The
+connect button lets you choose; DESIGN.md, "Wallets", describes the interface both
+speak.
 
 The site has two views, and follows the wallet's mode to choose between them.
 
@@ -53,4 +58,5 @@ through a proxy that serves the checkout at `/dex/` and passes every other path 
 box under its own name. The extension repository's stand-in box does this in its
 upstream mode (`test/market/box.mjs`, `upstream`); Chromium reaches it as the real host
 with `--host-resolver-rules="MAP sequentiatestnet.com 127.0.0.1:<port>"` and
-`--ignore-certificate-errors`. Wallet features need the extension.
+`--ignore-certificate-errors`. Wallet features need the extension or a running
+`sequentia-connect` that allows the site's origin.

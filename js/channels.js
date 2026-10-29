@@ -33,7 +33,7 @@ async function renderChannels() {
   if (!P.account()) {
     intro.textContent = P.hasWallet()
       ? 'Connect the wallet to see your Lightning channels.'
-      : 'SeqDEX needs the Sequentia extension wallet. Install it from the downloads page, then connect.';
+      : P.NO_WALLET;
     return;
   }
   intro.textContent = 'Loading channel state from your wallet…';

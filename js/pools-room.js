@@ -54,7 +54,7 @@ async function allPoolOffers() {
 async function draw() {
   if (S.mode !== 'developer') {
     room.textContent = '';
-    room.appendChild(el('p', 'sub', P.hasWallet() ? 'Nothing here in the wallet’s current mode.' : 'Nothing here without the Sequentia wallet extension.'));
+    room.appendChild(el('p', 'sub', P.hasWallet() ? 'Nothing here in the wallet’s current mode.' : 'Nothing here without a wallet.'));
     return;
   }
   document.title = 'Pools · SeqDEX';

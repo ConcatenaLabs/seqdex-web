@@ -36,6 +36,11 @@ contract (surfaces, books, settlement phases, provider dependencies).
   invoice handling in this repo; extend
   `sequentia-extension/doc/PROVIDER.md` first when a flow needs a new
   primitive, then consume it here.
+- **Pages never ask which wallet is connected.** Every call goes through
+  `shared/provider.js` to the chosen connector (`shared/connectors.js`: the
+  extension, or `sequentia-connect` on the loopback address); a page asks what
+  the wallet serves (`supports`, `rails`) and offers only that. A new connector
+  is a new entry there, never a branch in a page.
 - LNDEX = pure LN only. Submarine offers (ln_direction 0/1) and sub-asset
   offers (4/5) are the web wallet's business, never shown here.
 - Confidential DEX never gets a BTC leg (Bitcoin has no CT).
@@ -51,11 +56,14 @@ contract (surfaces, books, settlement phases, provider dependencies).
 the merged book, the chart's series, typed amounts; `shared/market-book.js`) and the
 leaves room's reading of the relay's book and fill records (`shared/leaf-room.js`,
 covenant orders and resting orders), and the pools room's reading of pools and
-clearing rounds (`shared/pool-room.js`, both orientations of a pool's two sides).
+clearing rounds (`shared/pool-room.js`, both orientations of a pool's two sides),
+and the wallet connectors (`shared/connectors.js`: rail groups, sessions).
 End to end, each with the extension and a relay on a private chain, the extension's
 `test/market/drive.mjs` drives the default view and its `test/leaf-room/drive.mjs`
 the leaves room, and its `test/resting/drive.mjs` orders resting in the operator's
-tree through both views; all serve this checkout as the site.
+tree through both views; all serve this checkout as the site. With your own stack,
+`sequentia-connect`'s `test/regtest/site-drive.mjs` drives the default view through
+the daemon (two Core wallets, two daemons, a limit order placed and taken).
 
 ## Deploy
 

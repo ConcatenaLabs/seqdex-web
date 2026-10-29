@@ -1,9 +1,12 @@
 # SeqDEX site: architecture
 
 The standalone SeqDEX website. It has no wallet of its own: every key
-operation goes through the Ambra browser extension (repo
-`sequentia-extension`) via `window.sequentia` (protocol:
-[`sequentia-extension/doc/PROVIDER.md`](https://github.com/ConcatenaLabs/sequentia-extension/blob/master/doc/PROVIDER.md)).
+operation goes through the wallet the person connects, behind one interface
+(see "Wallets" below): the Sequentia browser extension (repo
+`sequentia-extension`, `window.sequentia`), or the person's own Sequentia Core,
+Lightning node and leaf wallet through the `sequentia-connect` daemon on their
+computer (repo `sequentia-connect`). Both speak the same protocol:
+[`sequentia-extension/doc/PROVIDER.md`](https://github.com/ConcatenaLabs/sequentia-extension/blob/master/doc/PROVIDER.md).
 The site has two views. The default view is one market per pair, its book merged
 from the orders the wallet can settle in one step, and the wallet chooses how each
 trade settles; it names no rail. The developer view, shown while the wallet is in
@@ -217,13 +220,48 @@ shared core (`shared/`): provider glue, asset metadata (registry + prices),
 relay book client, UI tokens.
 
 The wallet drives everything sensitive. The site builds and displays;
-the extension signs, pays, and holds keys. If `window.sequentia` is absent
-the site runs read-only with an install prompt.
+the wallet signs, pays, and holds keys. With no wallet there, the site runs
+read-only and says how to get one.
+
+## Wallets
+
+`shared/connectors.js` holds the connectors and `shared/provider.js` is the one
+door every page goes through. A connector is anything that speaks the provider
+protocol: `request(method, params)`, `on(event, fn)`, and a `getCapabilities`
+answer whose `provider` names it. Pages never ask which wallet is behind the
+door; they ask what it serves (`supports(method)`, or `rails()`, which groups the
+method list: the account, the default view's market orders, on-chain fills,
+instant swaps, Lightning pay and receive, inbound liquidity, leaves, orders
+filled from leaves, orders resting as leaves, pools), and offer only that.
+
+- **The extension** (`extension`): `window.sequentia`, which must answer
+  `getCapabilities` with `provider: 'sequentia-wallet-extension'`. Every method
+  this site calls.
+- **Sequentia Core on this computer** (`local`): the `sequentia-connect` daemon
+  at `http://127.0.0.1:7419` (another loopback port with `?local=<port>`, kept in
+  the browser; `?local=default` clears it). Requests are `POST /v1/request
+  {method, params}` with the session the daemon gave at connect in the
+  `x-sequentia-session` header; events come from `GET /v1/events`, held open. It
+  must answer `getCapabilities` with `provider: 'sequentia-connect'`. The daemon
+  answers only the origins its owner allowed, and asks its owner in its own
+  terminal before it signs or pays anything. It serves the account, the default
+  view's market and limit orders between two Sequentia assets (covenant orders,
+  filled and rested from the Core wallet), Lightning channels, invoices and
+  payments (SeqLN or CLN), and in developer mode the leaf wallet's balances and
+  receive requests.
+
+The connect button opens a chooser with both, each marked Ready, Not installed or
+Not running. The choice is kept in the browser; with none made, the extension is
+used when it is installed, else the daemon once it answers. The daemon's port is
+looked for only when it is the chosen wallet, while no wallet is there at all,
+and when the chooser opens: a page whose wallet is the extension never knocks on
+it. The chooser's words follow the default-mode contract
+(`sequentia-web-wallet/docs/DEFAULT_MODE.md`, "Connect").
 
 ## Provider protocol dependencies
 
 Live in `sequentia-extension` (`doc/PROVIDER.md` is the contract; changes
-land there first):
+land there first, then in `sequentia-connect` for what it serves):
 
 - Shipped and used here: `connect`, `getAccounts`, `getNetwork`,
   `getBalances`, in the default view `placeOrder`, `getOrders` and `cancelOrder`
@@ -236,8 +274,9 @@ land there first):
   `fillRestingOrder`, `cancelRestingOrder`, `getRestingOrders`, and the
   `modeChanged`, `leafTake` and `leafArrived` events.
 - Also called, silently: `getCapabilities`, before any other method, so the
-  site refuses a `window.sequentia` that does not identify itself as
-  `sequentia-wallet-extension` (any page script can define that global);
+  site refuses a wallet that does not identify itself as the connector it was
+  chosen as (`sequentia-wallet-extension` or `sequentia-connect`; any page
+  script can define a `window.sequentia` of its own);
   and `getWalletMode` on every page, which decides whether the leaves room's
   link and tile are drawn.
 - Shipped in the provider but deliberately not wrapped here: `getAddress`,

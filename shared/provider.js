@@ -1,53 +1,98 @@
-// window.sequentia glue: detection, connect state, and typed request helpers.
-// The site never holds keys; every sensitive call round-trips the extension.
-// Only the methods this site actually uses get a wrapper: anything that
-// touches UTXOs, PSETs or invoices is the wallet's business and stays out of
-// this file so it can never be called from here by accident.
+// The site's one door to a wallet: whichever connector the person chose
+// (shared/connectors.js), behind the provider protocol of
+// sequentia-extension/doc/PROVIDER.md. The site never holds keys; every sensitive
+// call goes to the wallet, which asks its owner. Only the methods this site actually
+// uses get a wrapper: anything that touches UTXOs, PSETs or invoices is the wallet's
+// business and stays out of this file so it can never be called from here by accident.
+import { extensionConnector, localConnector, railsOf, LOCAL_DEFAULT_URL } from './connectors.js';
 
-// The identity string the genuine extension answers to getCapabilities
-// (sequentia-extension/doc/PROVIDER.md). Any page script can define a
-// window.sequentia of its own; this check is what keeps a look-alike from
-// harvesting a connect.
-const PROVIDER_ID = 'sequentia-wallet-extension';
+const CHOICE_KEY = 'seqdex.connector';
+// The daemon's address: its default port, or another on this computer's loopback
+// address that `?local=<port>` names (kept in the browser; `?local=default` clears it).
+// Nothing but a loopback address is taken, so a link cannot point the site's requests
+// at another machine.
+const LOCAL_KEY = 'seqdex.local.url';
+function localUrl() {
+  try {
+    const q = new URLSearchParams(location.search).get('local');
+    if (q === 'default') localStorage.removeItem(LOCAL_KEY);
+    else if (q && /^\d{2,5}$/.test(q) && Number(q) > 0 && Number(q) < 65536) localStorage.setItem(LOCAL_KEY, 'http://127.0.0.1:' + Number(q));
+    const v = localStorage.getItem(LOCAL_KEY);
+    if (v && /^http:\/\/(127\.0\.0\.1|localhost):\d{2,5}$/.test(v)) return v;
+  } catch { /* no storage: the default port */ }
+  return LOCAL_DEFAULT_URL;
+}
+const CONNECTORS = { extension: extensionConnector(), local: localConnector({ url: localUrl() }) };
 
 let cachedAccount = null;
 const listeners = new Set();
+const chooseListeners = new Set();
 
-export function hasWallet() {
-  return !!(window.sequentia && window.sequentia.isSequentia);
+function storedChoice() {
+  try { const v = localStorage.getItem(CHOICE_KEY); return CONNECTORS[v] ? v : null; } catch { return null; }
+}
+// The connector in use: the one the person chose last; else the extension when it is
+// installed; else the daemon on this computer once it answers.
+let chosen = storedChoice();
+function active() {
+  if (chosen) return CONNECTORS[chosen];
+  if (CONNECTORS.extension.present()) return CONNECTORS.extension;
+  if (CONNECTORS.local.present()) return CONNECTORS.local;
+  return CONNECTORS.extension;
 }
 
+export function connectors() { return Object.values(CONNECTORS); }
+export function activeConnector() { return active(); }
+export function onChoose(fn) { chooseListeners.add(fn); }
+
+// Switches to another connector: the account of the old one is forgotten, and every
+// page listening hears the change as an account change.
+export async function choose(id) {
+  if (!CONNECTORS[id]) throw new Error('no such wallet connector: ' + id);
+  chosen = id;
+  try { localStorage.setItem(CHOICE_KEY, id); } catch {}
+  genuine = null;
+  cachedAccount = null;
+  for (const fn of chooseListeners) { try { fn(id); } catch {} }
+  fireReady();
+  emit();
+}
+
+export function hasWallet() { return active().present(); }
 export function account() { return cachedAccount; }
 
 export function onAccountChange(fn) { listeners.add(fn); }
 function emit() { for (const fn of listeners) { try { fn(cachedAccount); } catch {} } }
 
 // ---- provider identity ----
-// Resolved once per page: the first request of any kind waits on it, so no
-// method ever reaches a provider that did not identify itself. A failed check
-// is not cached, so a transient error (the extension reloading) is retried
-// on the next call rather than locking the page out until reload.
+// Resolved once per connector: the first request of any kind waits on it, so no
+// method ever reaches a wallet that did not identify itself as the connector it was
+// chosen as. Any page script can define a window.sequentia of its own; this check is
+// what keeps a look-alike from harvesting a connect. A failed check is not cached,
+// so a transient error (the extension reloading, the daemon restarting) is retried.
 let genuine = null;
 function assertGenuine() {
-  if (genuine) return genuine;
+  if (genuine && genuine.conn === active()) return genuine.p;
+  const conn = active();
   const p = (async () => {
     let caps;
-    try { caps = await window.sequentia.request({ method: 'getCapabilities', params: {} }); }
-    catch (e) { throw new Error('the wallet provider did not identify itself: ' + (e && e.message ? e.message : e)); }
-    if (!caps || caps.provider !== PROVIDER_ID) {
-      throw new Error('refusing an unrecognised wallet provider on this page; install the Sequentia wallet extension and reload');
+    try { caps = await conn.request('getCapabilities', {}); }
+    catch (e) { throw new Error('the wallet did not identify itself: ' + (e && e.message ? e.message : e)); }
+    if (!caps || caps.provider !== conn.identity) {
+      throw new Error('refusing an unrecognised wallet on this page; install the Sequentia wallet extension or start sequentia-connect, then reload');
     }
     return caps;
   })();
-  genuine = p;
-  p.catch(() => { if (genuine === p) genuine = null; });
+  genuine = { conn, p };
+  p.catch(() => { if (genuine && genuine.p === p) genuine = null; });
   return p;
 }
 
 export async function request(method, params = {}) {
-  if (!hasWallet()) throw new Error('the Sequentia wallet extension is not installed');
+  const conn = active();
+  if (!conn.present()) throw new Error(conn.id === 'local' ? 'Sequentia Core on this computer is not answering' : 'the Sequentia wallet extension is not installed');
   if (method !== 'getCapabilities') await assertGenuine();
-  return await window.sequentia.request({ method, params });
+  return await conn.request(method, params);
 }
 
 // Silent session restore: succeeds only if the origin is connected AND the
@@ -72,12 +117,10 @@ export async function connect() {
 }
 
 // ---- provider lifecycle ----
-// The extension's inpage script is injected at document_start, but it can
-// still land after this module has run: an extension enabled or updated while
-// the tab is open, or a page restored from the back/forward cache. The
-// provider announces itself with a window event; everything that wires the
-// provider registers here so it runs exactly once, whether the provider was
-// there at init or arrived later.
+// The extension's inpage script can land after this module has run (an extension
+// enabled while the tab is open, a page restored from the back/forward cache), and the
+// daemon may be started after the page loads. Everything that wires a wallet registers
+// here so it runs once a wallet is there, whenever that is.
 const pending = new Set();
 function fireReady() {
   if (!hasWallet()) return;
@@ -90,22 +133,43 @@ export function onProvider(fn) {
   pending.add(fn);
   fireReady();
 }
-window.addEventListener('sequentia#initialized', fireReady);
+if (typeof window !== 'undefined') window.addEventListener('sequentia#initialized', () => { emitPresence(); fireReady(); });
 
-let watching = false;
+// The daemon is looked for when it is the wallet chosen, or while no wallet is there at
+// all (every few seconds, so starting it after the page opened is enough), and whenever
+// the chooser opens. A page whose wallet is the extension never knocks on the port.
+const presence = new Set();
+export function onPresence(fn) { presence.add(fn); }
+function emitPresence() { for (const fn of presence) { try { fn(); } catch {} } }
+async function probeLocal() {
+  const was = CONNECTORS.local.present();
+  const ok = await CONNECTORS.local.available();
+  if (ok !== was) emitPresence();
+  fireReady();
+  return ok;
+}
+const wantsLocal = () => chosen === 'local' || (!chosen && !CONNECTORS.extension.present());
+// The extension's inpage script runs before the page's own, so whether it is there is
+// known at load; one that lands later is announced by its event.
+export const localReady = wantsLocal() ? probeLocal() : Promise.resolve(false);
+export const probeLocalNow = probeLocal;
+if (typeof setInterval !== 'undefined') setInterval(() => { if (wantsLocal()) probeLocal(); }, 5000);
+
+const watched = new WeakSet();
 export function watchEvents() {
-  if (!hasWallet() || watching) return;
-  watching = true;
-  window.sequentia.on('accountsChanged', () => { restore(); });
-  window.sequentia.on('disconnect', () => { cachedAccount = null; emit(); });
+  const conn = active();
+  if (!hasWallet() || watched.has(conn)) return;
+  watched.add(conn);
+  conn.on('accountsChanged', () => { if (active() === conn) restore(); });
+  conn.on('disconnect', () => { if (active() === conn) { cachedAccount = null; emit(); } });
 }
 
-// Subscribe to a provider event. Returns false when there is no provider yet;
-// callers that need the subscription to survive late injection go through
-// onProvider.
+// Subscribe to a wallet event. Returns false when there is no wallet yet; callers that
+// need the subscription to survive a late wallet go through onProvider.
 export function onEvent(event, fn) {
+  const conn = active();
   if (!hasWallet()) return false;
-  try { window.sequentia.on(event, fn); return true; } catch { return false; }
+  return conn.on(event, (d) => { if (active() === conn) fn(d); });
 }
 
 // The wallet's mode ('developer' | 'user'); null when it cannot say. Needs no
@@ -114,12 +178,22 @@ export async function walletMode() {
   try { return (await request('getWalletMode')).mode || null; } catch { return null; }
 }
 
-// Whether the wallet serves a method (its getCapabilities list): an older wallet is told
-// to update rather than met with an unknown-method error.
+// Whether the wallet serves a method (its getCapabilities list): a wallet that does
+// not is told so in plain words rather than met with an unknown-method error.
 export async function supports(method) {
   try { const caps = await assertGenuine(); return Array.isArray(caps.methods) && caps.methods.includes(method); }
   catch { return false; }
 }
+
+// The groups of methods the wallet serves (connectors.js RAILS), for a page to decide
+// what to offer.
+export async function rails() {
+  try { const caps = await assertGenuine(); return railsOf(caps.methods); }
+  catch { return railsOf([]); }
+}
+
+// The words a page uses when no wallet is there to trade with.
+export const NO_WALLET = 'Trading needs a wallet: the Sequentia wallet extension, or Sequentia Core on this computer through sequentia-connect.';
 
 // ---- typed helpers over the raw protocol (only what the site calls) ----
 export const getBalances = () => request('getBalances');

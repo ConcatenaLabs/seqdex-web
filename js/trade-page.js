@@ -314,7 +314,7 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
     if (!P.account()) {
       box.appendChild(el('p', 'sub', P.hasWallet()
         ? 'Connect the wallet to see your balances here.'
-        : 'SeqDEX trades against the Sequentia extension wallet. Install it from the downloads page, create a wallet, and connect.'));
+        : P.NO_WALLET));
       return;
     }
     if (walletErr && !balances) {
