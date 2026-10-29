@@ -1,0 +1,169 @@
+/* SeqDEX's trading pages: the markets (Tickers), a pair's terminal and the portfolio.
+   Loaded after tokens.css. Buys green and sales amber, as in the wallets. */
+:root { --buy: #3ddc84; --sell: #f0a35e; --line2: #1d2129; }
+.term-page .wrap { max-width: 1500px; padding: 0 12px 70px; }
+.term-page .topbar { margin-bottom: 12px; }
+.up { color: var(--buy); } .down { color: var(--sell); }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.t-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.t-head { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); min-height: 44px; }
+.t-head h2 { font-size: 13px; font-weight: 700; margin: 0; }
+.t-tabs { display: flex; gap: 2px; flex-wrap: nowrap; }
+.t-tabs button { border: 0; background: none; color: var(--dim); font: 600 12.5px var(--disp); padding: 4px 9px; border-radius: 7px; white-space: nowrap; }
+.t-tabs button[aria-pressed="true"] { background: var(--panel2); color: var(--txt); box-shadow: inset 0 0 0 1px var(--line); }
+.t-tabs.sm button { font-size: 12px; padding: 3px 7px; }
+.t-sp { flex: 1; }
+.t-k { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; }
+.t-btn { border: 0; border-radius: 8px; padding: 6px 12px; font: 600 12.5px var(--disp); background: var(--panel2); color: var(--txt); box-shadow: inset 0 0 0 1px var(--line); }
+.t-btn:hover { box-shadow: inset 0 0 0 1px var(--accent); }
+
+/* ---- Tickers: search, the anchor, rows grouped by base ---- */
+.t-ctl { display: flex; gap: 8px; align-items: center; padding: 8px 12px; }
+.t-ctl input, .t-ctl select { height: 32px; margin: 0; padding: 0 10px; font-size: 13px; }
+.t-ctl input { flex: 1; min-width: 0; width: auto; }
+.t-ctl select { width: auto; min-width: 92px; }
+.t-ctl label { white-space: nowrap; }
+.t-tkbox { overflow-y: auto; }
+table.t-tkr { width: 100%; border-collapse: collapse; }
+table.t-tkr th { text-align: left; font-size: 11px; color: var(--faint); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: 7px 10px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); z-index: 1; }
+table.t-tkr th.r, table.t-tkr td.r { text-align: right; }
+table.t-tkr td { padding: 4px 10px; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; white-space: nowrap; }
+table.t-tkr tr.first td { border-top: 1px solid var(--line2); padding-top: 7px; }
+table.t-tkr tbody tr { cursor: pointer; }
+table.t-tkr tbody tr:hover td { background: var(--panel2); }
+table.t-tkr tr.cur td { background: rgba(143,184,255,.09); }
+table.t-tkr td.nm { font-family: var(--disp); font-weight: 600; }
+table.t-tkr .qt { color: var(--dim); font-family: var(--disp); font-size: 11.5px; margin-left: 4px; }
+table.t-tkr .star { border: 0; background: none; color: var(--faint); font-size: 14px; padding: 0 2px; }
+table.t-tkr .star[aria-pressed="true"] { color: var(--gold); }
+.t-markets .t-tkbox { max-height: none; }
+.t-markets table.t-tkr td { padding: 6px 12px; font-size: 13px; }
+.t-markets table.t-tkr tr.first td { padding-top: 10px; }
+.t-stats { display: flex; gap: 28px; align-items: flex-end; padding: 14px 16px 6px; flex-wrap: wrap; }
+.t-stats h1 { font-size: 22px; margin: 0 8px 0 0; }
+.t-stat { display: flex; flex-direction: column; }
+.t-stat .v { font-family: var(--mono); font-size: 15px; }
+
+/* ---- a pair's terminal ---- */
+.t-term { display: grid; grid-template-columns: 300px minmax(0, 1fr) 286px 300px; gap: 10px; align-items: stretch; }
+.t-left { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.t-left .t-tkbox { max-height: 470px; }
+.t-left table.t-tkr td { padding: 3px 8px; font-size: 12px; }
+.t-sum { padding: 12px 14px; display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; align-items: center; }
+.t-av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font: 700 11px var(--disp); color: #0b0c0f; background: var(--accent); grid-row: span 3; }
+.t-pair { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; }
+.t-pair .q { color: var(--faint); font-weight: 500; }
+.t-flip { border: 1px solid var(--line); border-radius: 6px; background: none; color: var(--faint); padding: 0 6px; font-size: 13px; }
+.t-last { font: 600 20px var(--mono); }
+.t-chart { display: flex; flex-direction: column; overflow: hidden; }
+.t-chartbox { flex: 1; min-height: 440px; position: relative; }
+.t-chartbox > .t-cv { position: absolute; inset: 0; }
+.t-legend { position: absolute; left: 12px; top: 8px; z-index: 3; font: 12px var(--mono); color: var(--dim); pointer-events: none; display: flex; gap: 12px; }
+.t-note { position: absolute; left: 12px; bottom: 34px; z-index: 3; font-size: 12px; color: var(--dim); pointer-events: none; }
+.t-indmenu { position: absolute; right: 12px; top: 6px; z-index: 5; width: 230px; padding: 8px; }
+.t-indmenu label { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px; font-size: 12.5px; color: var(--txt); margin: 0; }
+.t-indmenu label:hover { background: var(--panel2); }
+.t-indmenu input { width: auto; margin: 0; }
+.t-indmenu .sw { width: 10px; height: 3px; border-radius: 2px; }
+.t-book { display: flex; flex-direction: column; font-size: 12.5px; }
+.t-book .hd, .t-book .row { display: grid; grid-template-columns: 1.1fr 1fr 0.9fr; padding: 2.5px 12px; }
+.t-book .hd { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; padding: 7px 12px; }
+.t-book .hd span:nth-child(n+2), .t-book .row span:nth-child(n+2) { text-align: right; }
+.t-book .row { position: relative; font-family: var(--mono); font-variant-numeric: tabular-nums; cursor: pointer; }
+.t-book .row > span { position: relative; z-index: 1; }
+.t-book .row .bar { position: absolute; top: 1px; bottom: 1px; right: 0; z-index: 0; border-radius: 2px 0 0 2px; }
+.t-book .ask .bar { background: rgba(240,163,94,.13); } .t-book .bid .bar { background: rgba(61,220,132,.12); }
+.t-book .ask > span:first-child { color: var(--sell); } .t-book .bid > span:first-child { color: var(--buy); }
+.t-book .row:hover { background: var(--panel2); }
+.t-spread { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 7px 12px; border-top: 1px solid var(--line2); border-bottom: 1px solid var(--line2); margin: 3px 0; }
+.t-spread .l { font: 600 16px var(--mono); }
+.t-spread .s { color: var(--faint); font-size: 11px; text-align: right; }
+.t-deprat { display: flex; height: 5px; margin: 8px 12px 4px; border-radius: 3px; overflow: hidden; background: var(--line); }
+.t-deprat .b { background: rgba(61,220,132,.7); } .t-deprat .s { background: rgba(240,163,94,.7); }
+.t-deplbl { display: flex; justify-content: space-between; padding: 0 12px 10px; font-size: 11.5px; color: var(--dim); }
+.t-trades .row { grid-template-columns: 1fr 1fr 70px; }
+.t-trades .row span:nth-child(3) { color: var(--faint); }
+.t-empty { padding: 14px 12px; color: var(--dim); font-size: 12.5px; }
+
+/* the order ticket */
+.t-ticket { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.t-sides { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg); border-radius: 9px; padding: 3px; }
+.t-sides button { border: 0; background: none; padding: 8px; border-radius: 7px; font: 700 14px var(--disp); color: var(--dim); }
+.t-sides button.buy[aria-pressed="true"] { background: var(--buy); color: #08130c; }
+.t-sides button.sell[aria-pressed="true"] { background: var(--sell); color: #1a0f05; }
+.t-fld { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 7px 11px; display: flex; flex-direction: column; gap: 1px; }
+.t-fld:focus-within { border-color: var(--accent); }
+.t-fld .k { display: flex; justify-content: space-between; gap: 8px; }
+.t-fld .k em { font-style: normal; color: var(--dim); font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.t-fld .v { display: flex; align-items: baseline; gap: 8px; }
+.t-fld input { border: 0; background: none; padding: 0; margin: 0; font: 16px var(--mono); color: var(--txt); flex: 1; min-width: 0; width: auto; }
+.t-fld input:focus { border: 0; }
+.t-fld .v small { font: 600 12px var(--disp); color: var(--dim); }
+.t-pcts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.t-pcts button { border: 1px solid var(--line); background: none; border-radius: 6px; color: var(--dim); font: 600 11.5px var(--disp); padding: 3px; }
+.t-pcts button:hover { color: var(--txt); border-color: var(--accent); }
+.t-opts { border-top: 1px dashed var(--line); padding-top: 9px; display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; }
+.t-opts summary { color: var(--dim); cursor: pointer; }
+.t-opt { display: flex; align-items: flex-start; gap: 8px; margin: 0; color: var(--txt); font-size: 12.5px; }
+.t-opt input[type="checkbox"] { width: auto; margin: 3px 0 0; }
+.t-opt small { display: block; color: var(--faint); font-size: 11.5px; line-height: 1.35; }
+.t-opt select, .t-opt input[type="text"] { width: auto; margin: 0 0 0 6px; padding: 1px 6px; font-size: 12px; height: 24px; }
+.t-est { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; }
+.t-est div { display: flex; justify-content: space-between; gap: 8px; color: var(--dim); }
+.t-est div span:last-child { color: var(--txt); font-family: var(--mono); text-align: right; }
+.t-go { width: 100%; padding: 11px; border: 0; border-radius: 10px; font: 700 15px var(--disp); }
+.t-go.buy { background: var(--buy); color: #08130c; } .t-go.sell { background: var(--sell); color: #1a0f05; }
+.t-go:disabled { opacity: .6; }
+.t-small { font-size: 11.5px; color: var(--faint); line-height: 1.4; }
+.t-bal { display: flex; justify-content: space-between; font-size: 12px; color: var(--dim); }
+
+/* your orders, under the terminal */
+.t-bottom { margin-top: 10px; }
+table.t-ord { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.t-ord th { text-align: left; font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; padding: 8px 12px; border-bottom: 1px solid var(--line2); }
+table.t-ord td { padding: 8px 12px; border-bottom: 1px solid var(--line2); vertical-align: middle; }
+table.t-ord th.r, table.t-ord td.r { text-align: right; }
+.t-prog { width: 64px; height: 4px; background: var(--line); border-radius: 2px; display: inline-block; vertical-align: middle; margin-right: 6px; overflow: hidden; }
+.t-prog i { display: block; height: 100%; background: var(--accent); }
+.t-st { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: rgba(143,184,255,.12); color: var(--accent); white-space: nowrap; }
+.t-st.settled { background: rgba(61,220,132,.12); color: var(--buy); }
+.t-st.returned, .t-st.failed { background: rgba(151,160,174,.12); color: var(--dim); }
+.t-scroll { overflow-x: auto; }
+
+/* the portfolio */
+.t-pf-top { display: grid; grid-template-columns: 1fr 1.3fr; gap: 10px; margin-bottom: 10px; }
+.t-total { padding: 18px 20px; }
+.t-total .v { font: 600 30px var(--mono); }
+.t-alloc { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin: 14px 0 10px; background: var(--line); }
+.t-alleg { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--dim); }
+.t-alleg i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; }
+.t-arr { display: block; font-size: 11.5px; color: var(--accent); }
+
+/* ---- phone: one column, the ticket in a sheet ---- */
+.t-phone-bar, .t-sheet-shade { display: none; }
+@media (max-width: 1180px) {
+  .t-term { grid-template-columns: minmax(0, 1fr) 286px 300px; }
+  .t-left { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr; }
+  .t-left .t-tickers { display: none; }
+  .t-left.open .t-tickers { display: block; }
+}
+@media (max-width: 860px) {
+  .term-page .wrap { padding: 0 10px 140px; }
+  .t-term { grid-template-columns: minmax(0, 1fr); }
+  .t-chartbox { min-height: 300px; }
+  .t-ticket-card { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; border-radius: 18px 18px 0 0; max-height: 86vh; overflow-y: auto; transform: translateY(105%); transition: transform .2s; }
+  .t-ticket-card.open { transform: none; }
+  .t-sheet-shade.open { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(0,0,0,.55); }
+  .t-phone-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 10px 12px 16px; background: linear-gradient(transparent, var(--bg) 22%); }
+  .t-pf-top { grid-template-columns: 1fr; }
+  table.t-ord .wide { display: none; }
+  .t-markets table.t-tkr .wide { display: none; }
+  .t-markets table.t-tkr td, .t-markets table.t-tkr th { padding-left: 8px; padding-right: 8px; }
+  .t-ctl { flex-wrap: wrap; }
+  .t-ctl input { flex: 1 1 100%; }
+  .t-head { flex-wrap: wrap; }
+  .t-legend { display: none; }
+  .t-stats .t-stat .v { font-size: 13px; }
+  .t-stats { gap: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .t-ticket-card { transition: none; } }

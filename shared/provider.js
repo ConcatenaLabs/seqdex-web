@@ -217,6 +217,13 @@ export async function supports(method) {
 
 // The groups of methods the wallet serves (connectors.js RAILS), for a page to decide
 // what to offer.
+// What the wallet offers beyond its methods (getCapabilities' `features`), such as the
+// order options: a control that needs one is drawn only when the wallet lists it.
+export async function features() {
+  try { const caps = await assertGenuine(); return new Set(Array.isArray(caps.features) ? caps.features : []); }
+  catch { return new Set(); }
+}
+
 export async function rails() {
   try { const caps = await assertGenuine(); return railsOf(caps.methods); }
   catch { return railsOf([]); }

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="shared/sequentia-mark.svg">
+<title>SeqDEX · Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/tokens.css">
+<link rel="stylesheet" href="shared/terminal.css">
+</head>
+<body class="surface-market term-page">
+<div class="wrap">
+  <header class="topbar"></header>
+  <div class="t-pf-top">
+    <div class="t-card t-total">
+      <span class="t-k">Total</span>
+      <div class="v" id="pfTotal">-</div>
+      <div class="t-alloc" id="pfAlloc"></div>
+      <div class="t-alleg" id="pfLegend"></div>
+    </div>
+    <div class="t-card" style="padding:14px 16px">
+      <span class="t-k">Assets</span>
+      <p class="t-small" id="pfNote" style="margin-top:6px">Each asset's one figure, wherever your wallet holds it, valued in US dollars. What has arrived and cannot be spent yet shows under its figure.</p>
+    </div>
+  </div>
+  <div class="t-card"><div class="t-scroll"><table class="t-ord" id="pfAssets"><thead><tr><th>Asset</th><th class="r">Amount</th><th class="r wide">Price</th><th class="r">Value</th><th class="r wide">Share</th><th></th></tr></thead><tbody></tbody></table></div></div>
+  <div class="t-card t-bottom">
+    <div class="t-head">
+      <div class="t-tabs" id="ordTabs"><button type="button" data-o="open" aria-pressed="true">Open orders</button><button type="button" data-o="trades" aria-pressed="false">Trades</button><button type="button" data-o="history" aria-pressed="false">Order history</button></div>
+      <span class="t-sp"></span>
+      <button type="button" class="t-btn" id="exportCsv">Export CSV</button>
+    </div>
+    <p id="ordersNote" class="t-empty" hidden></p>
+    <div class="t-scroll" id="ordersBox"></div>
+  </div>
+</div>
+<script type="module">
+  import { initChrome, footer } from './shared/app.js';
+  import { runPortfolioPage } from './js/portfolio-page.js';
+  await initChrome('portfolio.html');
+  footer();
+  runPortfolioPage();
+</script>
+</body>
+</html>

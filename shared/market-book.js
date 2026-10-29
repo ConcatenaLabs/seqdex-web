@@ -1,5 +1,5 @@
 // The default view's market: one market per pair of assets, its book merged from every
-// order the wallet can settle in one step, and its trades for the price chart. Pure:
+// order the wallet can settle in one step. Pure:
 // the page fetches, this file arranges. Every amount stays in atoms (BigInt) until the
 // page formats it; prices are quote units per base unit (numbers, for display only).
 //
@@ -36,26 +36,6 @@ export function orient(a, b, tickerOf = (h) => h) {
   const ra = quoteRank(a, tickerOf), rb = quoteRank(b, tickerOf);
   if (ra !== rb) return ra > rb ? { base: b, quote: a } : { base: a, quote: b };
   return String(a) < String(b) ? { base: a, quote: b } : { base: b, quote: a };
-}
-
-// The pairs of the default view, each once, from the relays' market lists: every
-// Sequentia pair of the on-chain book, and every pair against BTC the instant makers
-// quote. BTC pairs come first, then the rest by ticker.
-export function pairsOf({ chainMarkets = [], instantMarkets = [], tickerOf }) {
-  const seen = new Map();
-  const add = (a, b) => {
-    if (!a || !b || a === b) return;
-    const p = orient(a, b, tickerOf);
-    const k = p.base + '/' + p.quote;
-    if (!seen.has(k)) seen.set(k, { ...p, key: k });
-  };
-  for (const m of chainMarkets) if (m.base !== 'BTC' && m.quote !== 'BTC' && !m.confidential) add(m.base, m.quote);
-  for (const m of instantMarkets) if (m.base === 'BTC' || m.quote === 'BTC') add(m.base, m.quote);
-  const label = (p) => String(tickerOf(p.base)) + '/' + String(tickerOf(p.quote));
-  return [...seen.values()].sort((x, y) => {
-    const bx = x.quote === 'BTC' ? 0 : 1, by = y.quote === 'BTC' ? 0 : 1;
-    return bx - by || label(x).localeCompare(label(y));
-  });
 }
 
 // What each covenant order of a pair still holds, from the relay's fill records (`fills`
@@ -143,31 +123,6 @@ export function mergeBook(offers, opts) {
   return { asks, bids, best: { ask: asks[0] ? asks[0].price : null, bid: bids[0] ? bids[0].price : null } };
 }
 
-// The price chart's points: the trades of both orientations, as quote units per base
-// unit, oldest first. A trade on the reversed market is turned round.
-export function seriesOf({ trades = [], reversed = [], basePrec, quotePrec }) {
-  const scale = Math.pow(10, basePrec - quotePrec);
-  const pts = [];
-  for (const t of trades) if (t.price > 0) pts.push({ t: Number(t.ts), price: Number(t.price) * scale });
-  for (const t of reversed) if (t.price > 0) pts.push({ t: Number(t.ts), price: (1 / Number(t.price)) * scale });
-  return pts.sort((a, b) => a.t - b.t);
-}
-
-// The one price a market shows, in its list entry and in its header alike: the middle
-// of the book while it has buyers and sellers; otherwise the last trade; otherwise none
-// (a reference price that no order or trade backs is never shown as the market's).
-// `kind` names it in plain words: 'mid' (the middle of the book) or 'last' (the last
-// trade). `series` is seriesOf's points, oldest first.
-export function marketPrice(book, series) {
-  if (book && book.best && book.best.ask != null && book.best.bid != null) {
-    return { price: (book.best.ask + book.best.bid) / 2, kind: 'mid' };
-  }
-  const last = (series || []).at(-1);
-  if (last && last.price > 0) return { price: last.price, kind: 'last', at: last.t };
-  return null;
-}
-export const PRICE_WORDS = { mid: 'middle of the book', last: 'last trade' };
-
 // A price typed by the user, in quote units per base unit, as quote atoms per whole base
 // unit (the wallet's `price`). Digits and one point only.
 export function priceAtoms(str, quotePrec) {
@@ -205,4 +160,30 @@ export function estimate(book, side, amount) {
     left -= take;
   }
   return { base, quote, short: left > 0n };
+}
+
+// The book read the other way round: the quote becomes the base. An ask (base for quote)
+// becomes a bid of the quote at the inverse price, its size the quote it would take; a
+// bid becomes an ask. Each side is sorted best first, with its running depth again.
+export function invertBook(book) {
+  const flip = (l) => ({ ...l, price: l.price > 0 ? 1 / l.price : 0, size: l.total, total: l.size });
+  const run = (levels) => { let d = 0n; for (const l of levels) { d += l.size; l.depth = d; } return levels; };
+  const asks = run((book.bids || []).map(flip).sort((a, b) => a.price - b.price));
+  const bids = run((book.asks || []).map(flip).sort((a, b) => b.price - a.price));
+  return { asks, bids, best: { ask: asks[0] ? asks[0].price : null, bid: bids[0] ? bids[0].price : null } };
+}
+
+// What the wallet holds of each asset, one figure as the wallet shows it: its `total` where it
+// answers one (getCapabilities' 'balances-total'), else its coins on the chain and its leaves
+// (getBalances' `leaves`), and BTC on the chain.
+export function spendableOf(b) {
+  if (b && b.total && typeof b.total === 'object') return { ...b.total };
+  const out = {};
+  if (b && b.btc != null) out.BTC = String(b.btc);
+  for (const part of [b && b.assets, b && b.leaves]) {
+    for (const [h, v] of Object.entries(part || {})) {
+      try { out[h] = (BigInt(out[h] || 0) + BigInt(v || 0)).toString(); } catch {}
+    }
+  }
+  return out;
 }

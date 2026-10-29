@@ -1,6 +1,7 @@
 // Shared page chrome: topbar injection, wallet connect button, helpers.
 import * as P from './provider.js';
 import { loadMeta } from './meta.js';
+import { CHART_NOTICE } from './chart.js';
 
 export const $ = (id) => document.getElementById(id);
 const DOWNLOADS = 'https://sequentiatestnet.com/download/';
@@ -15,11 +16,16 @@ export const el = (t, c, txt) => {
   return e;
 };
 
+// Every view's pages: the markets (index.html, and a pair's market.html) and the
+// portfolio. A pair's page counts as Markets.
+const MAIN = [
+  ['index.html', 'Markets', 'market', ['market.html']],
+  ['portfolio.html', 'Portfolio', 'market', []],
+];
 // The developer view's pages: one room per way of settling, and the leaves room. The
-// default view (index.html, the markets) names none of them; they are linked only while
-// the view is the developer one.
+// default view names none of them; they are linked only while the view is the
+// developer one.
 const PAGES = [
-  ['index.html', 'Markets', 'market'],
   ['rooms.html', 'Rooms', 'chain'],
   ['lndex.html', 'LNDEX', 'ln'],
   ['onchain.html', 'On-chain DEX', 'chain'],
@@ -68,6 +74,12 @@ export async function initChrome(active) {
 
   const nav = el('nav', 'nav');
   nav.id = 'devNav';
+  for (const [href, label, s, also] of MAIN) {
+    const a = el('a', null, label);
+    a.href = href; a.dataset.s = s;
+    if (href === here || href === active || also.includes(here)) a.classList.add('on');
+    nav.appendChild(a);
+  }
   const links = [];
   for (const [href, label, s] of PAGES) {
     const a = el('a', null, label);
@@ -281,12 +293,15 @@ function renderConnect(btn, acc, walletPresent) {
   }
 }
 
-export function footer() {
+// The footer; `chart` adds the chart library's notice and its link, which every page
+// that draws a chart shows.
+export function footer({ chart = false } = {}) {
   const f = el('div', 'foot');
   const mk = (href, txt) => { const a = el('a', null, txt); a.href = href; a.target = '_blank'; a.rel = 'noopener'; return a; };
   f.appendChild(el('span', null, 'SeqDEX · non-custodial · Sequentia testnet'));
   f.appendChild(mk('https://sequentiatestnet.com/', 'Explorer'));
   f.appendChild(mk('https://sequentiatestnet.com/download/', 'Wallet downloads'));
   f.appendChild(mk('https://github.com/ConcatenaLabs/seqdex-web', 'Source'));
+  if (chart) f.appendChild(mk(CHART_NOTICE.href, CHART_NOTICE.text));
   document.querySelector('.wrap').appendChild(f);
 }
