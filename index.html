@@ -4,61 +4,37 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="shared/sequentia-mark.svg">
-<title>SeqDEX</title>
+<title>SeqDEX · Markets</title>
+<script>
+  // A link to a pair (index.html?pair=GOLD-USDX) opens that pair's page.
+  if (new URLSearchParams(location.search).has('pair')) location.replace('market.html' + location.search);
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shared/tokens.css">
+<link rel="stylesheet" href="shared/terminal.css">
 </head>
-<body class="surface-market">
+<body class="surface-market term-page">
 <div class="wrap">
   <header class="topbar"></header>
-
-  <div class="market-grid">
-    <div class="panel">
-      <h2>Markets</h2>
-      <p class="faint price-note">Each price is the middle of the book; where the book lacks buyers or sellers, it is the last trade.</p>
-      <div id="pairList"><p class="sub">Loading…</p></div>
+  <div class="t-card t-markets">
+    <div class="t-stats">
+      <h1>Markets</h1>
+      <div class="t-stat"><span class="t-k">Markets</span><span class="v" id="stMarkets">-</span></div>
+      <div class="t-stat"><span class="t-k">24h volume</span><span class="v" id="stVolume">-</span></div>
+      <div class="t-stat"><span class="t-k">Trades 24h</span><span class="v" id="stTrades">-</span></div>
     </div>
-
-    <div class="market-main">
-      <div class="panel">
-        <div class="mkt-head"><h2 id="pairTitle">Market</h2><span class="price-box"><span id="lastPrice" class="mono"></span><span id="priceKind" class="faint"></span></span></div>
-        <svg id="chart" class="chart" viewBox="0 0 600 160" preserveAspectRatio="none" role="img" aria-label="Price of recent trades"></svg>
-        <p id="chartNote" class="faint"></p>
-      </div>
-      <div class="panel">
-        <h2>Order book</h2>
-        <div class="scroll">
-          <table class="book depth">
-            <thead><tr><th>Price</th><th id="bookAmountHead">Amount</th><th>Total</th></tr></thead>
-            <tbody id="bookBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <div class="market-side">
-      <div class="panel" id="orderForm"></div>
-      <div class="panel" id="balances"></div>
-    </div>
-  </div>
-
-  <div class="panel orders-panel">
-    <h2>Your orders</h2>
-    <p id="ordersNote" class="sub"></p>
-    <div class="orders-grid">
-      <div><h3>Open</h3><div id="openOrders"></div></div>
-      <div><h3>History</h3><div id="history"></div></div>
-    </div>
+    <div id="tickers"></div>
+    <p class="t-small" style="padding:10px 16px 14px">Each price is the last trade, in the asset named beside it. Volume is in US dollars, the same for both rows of a market.</p>
   </div>
 </div>
 <script type="module">
   import { initChrome, footer } from './shared/app.js';
-  import { runMarketPage } from './js/market-page.js';
+  import { runMarketsPage } from './js/markets-page.js';
   await initChrome('index.html');
   footer();
-  await runMarketPage();
+  runMarketsPage();
 </script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 // SeqDEX's charts: a pair's price (candles or a step line, with volume and the
 // indicators of shared/indicators.js) and its book's depth, drawn with TradingView
-// Lightweight Charts (vendor/lightweight-charts). The wallets draw their market
+// Lightweight Charts (vendored unmodified). The wallets draw their market
 // view with the same library and the same ranges, colours and words, so a person
 // moving between them sees one chart.
 //

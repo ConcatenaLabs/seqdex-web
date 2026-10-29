@@ -262,44 +262,6 @@ table.leaf-book tr.why td { text-align: left; }
 .field { display: grid; gap: 4px; margin: 0 0 10px; }
 .field input, .field select, .leaf-book input { background: var(--panel2); color: var(--txt); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 13px; }
 
-/* ---- the default view: markets ---- */
-.market-grid { display: grid; grid-template-columns: 240px 1fr 300px; gap: 16px; align-items: start; }
-.market-main, .market-side { display: grid; gap: 16px; }
-@media (max-width: 1020px) { .market-grid { grid-template-columns: 1fr; } }
-.mkt-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.mkt-head #lastPrice { font-size: 20px; color: var(--txt); }
-.mkt-head .price-box { display: grid; justify-items: end; line-height: 1.2; }
-.mkt-head #priceKind { font-size: 12px; }
-p.price-note { font-size: 12px; margin: -4px 0 10px; }
-svg.chart { width: 100%; height: 160px; display: block; margin: 8px 0 4px; }
-svg.chart .line { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
-svg.chart .axis { fill: var(--dim); font: 11px var(--mono); }
-table.book.depth { width: 100%; }
-table.book.depth tr.lvl { cursor: default; }
-table.book.depth tr.lvl.ask { background: linear-gradient(to left, rgba(255,107,122,.13) var(--depth), transparent var(--depth)); }
-table.book.depth tr.lvl.bid { background: linear-gradient(to left, rgba(61,220,132,.13) var(--depth), transparent var(--depth)); }
-table.book.depth td.bid { color: var(--green); }
-.btn.side-buy[aria-pressed="true"] { background: var(--green); border-color: var(--green); color: #0b0c0f; }
-.btn.side-sell[aria-pressed="true"] { background: var(--red); border-color: var(--red); color: #0b0c0f; }
-.btn.go { width: 100%; margin-top: 12px; }
-.btn.go-buy { background: var(--green); border-color: var(--green); color: #0b0c0f; }
-.btn.go-sell { background: var(--red); border-color: var(--red); color: #0b0c0f; }
-p.est { margin-top: 8px; min-height: 1.5em; }
-.orders-panel { margin-top: 16px; }
-.orders-panel h3 { font-size: 13px; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; margin: 6px 0 8px; }
-.orders-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-@media (max-width: 860px) { .orders-grid { grid-template-columns: 1fr; } }
-.order { padding: 10px 0; border-top: 1px solid var(--line); }
-.order:first-child { border-top: 0; }
-.order b.buy { color: var(--green); } .order b.sell { color: var(--red); }
-.order .btn { margin-top: 6px; }
-.hrow { display: grid; grid-template-columns: 150px 1fr auto; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); align-items: baseline; }
-.hrow:first-child { border-top: 0; }
-@media (max-width: 600px) { .hrow { grid-template-columns: 1fr auto; } .hrow > span:first-child { grid-column: 1 / -1; } }
-.pill.state-settled { color: var(--green); border-color: var(--green); }
-.pill.state-sent, .pill.state-returned { color: var(--dim); border-color: var(--line); }
-.pill.state-failed { color: var(--red); border-color: var(--red); }
-
 /* Pairing a wallet on a phone: the code to scan, over the page. */
 .pair-modal { position: fixed; inset: 0; background: rgba(0, 0, 0, .55); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
 .pair-card { background: var(--panel, #fff); color: inherit; border-radius: 12px; padding: 20px; max-width: 360px; width: 100%; display: flex; flex-direction: column; gap: 10px; }

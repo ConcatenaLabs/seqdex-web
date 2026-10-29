@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { orient, pairsOf, mergeBook, rowOf, remaindersOf, seriesOf, priceAtoms, amountAtoms, estimate, marketPrice, PRICE_WORDS } from '../shared/market-book.js';
+import { orient, mergeBook, rowOf, remaindersOf, priceAtoms, amountAtoms, estimate } from '../shared/market-book.js';
 
 const G = 'aa'.repeat(32), U = 'bb'.repeat(32), S = 'cc'.repeat(32);
 const tick = { [G]: 'GOLD', [U]: 'USDX', [S]: 'tSEQ', BTC: 'BTC' };
@@ -26,15 +26,6 @@ test("a pair has the wallets' one orientation: BTC, then the fiat stablecoins, q
   // Two other assets: the id that sorts first is the base, whatever their prices.
   assert.deepEqual(orient(S, G, tickerOf), { base: G, quote: S });
   assert.deepEqual(orient(G, S, tickerOf), { base: G, quote: S });
-});
-
-test('each pair is listed once, BTC pairs first, interactive-only and confidential markets aside', () => {
-  const pairs = pairsOf({
-    chainMarkets: [{ base: G, quote: U }, { base: U, quote: G }, { base: S, quote: U }, { base: G, quote: 'BTC' }, { base: G, quote: S, confidential: true }],
-    instantMarkets: [{ base: G, quote: 'BTC' }, { base: G, quote: U }],
-    tickerOf,
-  });
-  assert.deepEqual(pairs.map((p) => tickerOf(p.base) + '/' + tickerOf(p.quote)), ['GOLD/BTC', 'GOLD/USDX', 'tSEQ/USDX']);
 });
 
 const cov = (sell, want, locked, num, den, extra = {}) => ({
@@ -78,11 +69,6 @@ test('against BTC the book is the instant makers\' quotes only', () => {
   assert.equal(rowOf(sub, opts), null);
 });
 
-test('the chart turns the reversed market\'s trades round', () => {
-  const s = seriesOf({ trades: [{ ts: 2, price: 4100 }], reversed: [{ ts: 1, price: 1 / 4000 }], basePrec: 8, quotePrec: 8 });
-  assert.deepEqual(s.map((p) => [p.t, Math.round(p.price)]), [[1, 4000], [2, 4100]]);
-});
-
 test('typed prices and amounts become atoms exactly', () => {
   assert.equal(priceAtoms('4146', 8), 414_600_000_000n);
   assert.equal(priceAtoms('0.5', 2), 50n);
@@ -99,16 +85,6 @@ test('the form\'s estimate walks the levels from the best', () => {
   assert.equal(estimate(book, 'sell', 1n).short, true);
 });
 
-test('a market shows one price: the middle of the book, else the last trade, else none', () => {
-  const both = { best: { ask: 91.55, bid: 90.65 } }, oneSide = { best: { ask: 91.55, bid: null } }, empty = { best: { ask: null, bid: null } };
-  const series = [{ t: 1, price: 97.53 }, { t: 2, price: 92 }];
-  assert.deepEqual(marketPrice(both, series), { price: 91.1, kind: 'mid' });
-  assert.deepEqual(marketPrice(oneSide, series), { price: 92, kind: 'last', at: 2 });
-  assert.equal(marketPrice(empty, []), null);
-  assert.equal(marketPrice(oneSide, []), null);
-  assert.equal(PRICE_WORDS.mid, 'middle of the book');
-});
-
 test('a resting order is one more order of its market, at what its coin holds', () => {
   const A = 'aa'.repeat(32), B = 'bb'.repeat(32);
   const ask = { offer_id: 'r', offer_asset: A, want_asset: B, offer_amount: '600000', _active: '400000',
@@ -122,4 +98,20 @@ test('a resting order is one more order of its market, at what its coin holds', 
   const book = mergeBook([ask, bid], opts);
   assert.equal(book.best.ask, 2);
   assert.equal(book.best.bid, 4);
+});
+
+test('a book read the other way round: asks become bids at the inverse price, sizes swap', async () => {
+  const { invertBook, spendableOf } = await import('../shared/market-book.js');
+  const book = {
+    asks: [{ price: 4000, size: 2n, total: 8000n, orders: 1 }, { price: 4100, size: 1n, total: 4100n, orders: 1 }],
+    bids: [{ price: 3900, size: 3n, total: 11700n, orders: 2 }],
+  };
+  const inv = invertBook(book);
+  assert.deepEqual(inv.asks.map((l) => [l.price, l.size, l.total, l.depth]), [[1 / 3900, 11700n, 3n, 11700n]]);
+  assert.deepEqual(inv.bids.map((l) => [l.price, l.size, l.total]), [[1 / 4000, 8000n, 2n], [1 / 4100, 4100n, 1n]]);
+  assert.equal(inv.bids[1].depth, 12100n);
+  assert.equal(inv.best.bid, 1 / 4000); assert.equal(inv.best.ask, 1 / 3900);
+  // The wallet's one figure per asset: its total where it answers one, else chain + leaves.
+  assert.deepEqual(spendableOf({ total: { a: '5' }, assets: { a: '1' } }), { a: '5' });
+  assert.deepEqual(spendableOf({ btc: '7', assets: { a: '1' }, leaves: { a: '2' } }), { BTC: '7', a: '3' });
 });

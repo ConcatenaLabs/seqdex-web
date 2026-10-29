@@ -14,23 +14,34 @@ trade settles; it names no rail. The developer view, shown while the wallet is i
 developer mode, adds one room per way of settling, each with its own book, never
 merged, colour-coded so the user always knows which settlement world they are in.
 
-## The default view: markets (`index.html`, accent: neutral blue)
+## The default view: markets, a pair, the portfolio (accent: neutral blue)
 
-One market per pair of assets, a book with its depth and a price chart, a market
-order and a limit order behind one form and one button, and the user's open orders
-and history. It is what every visitor sees unless the wallet is in developer mode or
-the site's override says otherwise (`?view=developer|default|wallet`, kept in the
-browser).
+Three pages, a trading terminal on Sequentia's market data. They are what every visitor
+sees unless the wallet is in developer mode or the site's override says otherwise
+(`?view=developer|default|wallet`, kept in the browser). Their words are in the
+default-mode contract (`sequentia-web-wallet/docs/DEFAULT_MODE.md`, "SeqDEX").
 
-- **Pairs.** Each pair is listed once, whichever way round its orders were listed:
-  the quote is the pair's unit of account, BTC first, then the fiat stablecoins
-  (USDX, then EURX, then the bridged ones); between two other assets, the one whose id sorts first is the
-  base. This is the wallets' rule (`sequentia-web-wallet` `swap.js`,
-  `canonicalPair`), which the makers post in too, so a pair reads one way on every
-  surface. BTC pairs come first. The list is the
-  on-chain book's markets and the pure-Lightning book's BTC markets, plus the pairs
-  of what the connected wallet holds (with each other and with BTC) and the pair a
-  link names (`?pair=GOLD-USDX`), so the first order of a new market can be placed.
+- **Markets** (`index.html`, `js/markets-page.js`): the Tickers panel
+  (`js/tickers-panel.js` on `shared/tickers.js`), from the relay's one answer for every
+  market (`/seqob/v1/tickers`). Every market is two rows, its base priced in its quote
+  and the other way round, each figure turned round with it (last, high, low, 24-hour
+  change); volume is in the reference currency, the same for both rows. "Priced in Any"
+  lists every asset once, BTC first and then by volume, with a row for each asset it
+  trades against; choosing an asset prices every market in it. A search matches either
+  side; favourites are kept in the browser; "You hold" keeps the assets the wallet
+  holds. A row opens its pair. A link to a pair on this page
+  (`index.html?pair=GOLD-USDX`) opens the pair's page.
+- **A pair** (`market.html?pair=GOLD-USDX`, `js/market-page.js`): the pair's last
+  price and day beside the Tickers panel (compact), the chart, the book and recent
+  trades, the order ticket, and your orders. The pair is shown the way round the link
+  names it, and ⇄ turns it round. A market's own direction (`orient`) is the
+  wallets' (`sequentia-web-wallet` `swap.js`, `canonicalPair`): the quote is the
+  pair's unit of account, BTC first, then the fiat stablecoins (USDX, then EURX, then
+  the bridged ones); between two other assets, the one whose id sorts first is the
+  base. The makers post in it, and every order goes to the wallet in it; a pair shown
+  the other way round reads the book in the market's direction and turns it round
+  for display (`invertBook`), and its ticket asks for what is spent on a buy and
+  received on a sale, so every amount the wallet is asked for is exact.
 - **The book.** Only orders the wallet settles in one step, merged
   (`shared/market-book.js`): between two Sequentia assets, the orders on `/seqob`
   that fill with their makers away (covenant orders on the chain, and orders resting
@@ -45,23 +56,33 @@ browser).
   a covenant order at the amount it was signed with; the book reads what the order
   holds from the relay's fill records (the order rests again at the fill's output
   2k+1). Levels are grouped by price, with their running depth.
-- **The market's price.** One price per market, the same in its list entry and in
-  its header (`marketPrice`): the middle of the book while it has buyers and sellers;
-  otherwise the last trade; otherwise none. The header names which in plain words, and
-  the list says it once above the markets. An asset's reference price alone is never
-  shown as a market's price.
-- **Values.** Prices and totals in the reference currency (the price server's
-  numbers), amounts in the asset's own units. The chart plots the pair's trades
-  (both orientations) valued at today's price of the quote.
+- **Prices and the chart.** A price is the last trade, in the quote's own units; the
+  book's spread line gives the spread and the middle of the book; a book whose best bid
+  is above its best ask is shown as it is. Totals are in the reference currency. The
+  ticker, the candles and the trades come from the relay in the pair's direction
+  (`/seqob/v1/market/{base}/{quote}/ticker|candles|trades`; that relay follows the
+  others, so every rail's trades are in them). The chart (`shared/chart.js`) shows
+  the price as candles or a step line over 1D, 1W, 1M, 3M, 1Y or All, with volume and
+  the indicators of `shared/indicators.js`, or the book's depth.
 - **Trading.** `placeOrder` with the type, side, amount and, for a limit order, the
   price; the wallet reads the book itself, picks the orders, settles each, and rests
-  what a limit order does not fill. The form's estimate is the page's own walk of
-  the book and says the wallet shows the exact amounts.
-- **Your orders.** `getOrders`, polled. An open order shows how much is filled, and
-  either a button to take back what is left (`cancelOrder`), once its time has run
-  out, or the words saying from when it can be. History lists each trade and each
-  order filled or taken back; a fill reads "Sent" until the relay calls it final
-  (its block certified and its Bitcoin anchor buried), then "Settled".
+  what a limit order does not fill. Order types and options beyond market and limit
+  (an auction, post only, nothing left resting, the smallest fill, when an order can
+  be taken back) are drawn only when the wallet lists them in `getCapabilities`'
+  `features`. The ticket's estimate is the page's own walk of the book (what fills now
+  and what rests) and says the wallet shows the exact amounts.
+- **Your orders** (`js/orders-view.js`, on the pair's page and the portfolio):
+  `getOrders`, polled. Open orders show how much is filled, and either a button to
+  take back what is left (`cancelOrder`), once its time has run out, or from when it
+  can be. Trades are one row each, "Swapped … for …", reading "Sent" until the relay
+  calls them final (the block certified and its Bitcoin anchor buried), then
+  "Settled". Order history lists the orders filled or taken back.
+- **Portfolio** (`portfolio.html`, `js/portfolio-page.js`): one total in the reference
+  currency, then each asset's one figure wherever the wallet holds it (its `total`
+  where the wallet lists `balances-total`), BTC first, then by value, with what is
+  still arriving; your orders and trades; and the trades as a CSV file.
+- **Phone.** One column; the ticket opens as a sheet from Buy and Sell at the foot
+  of the screen; the Tickers panel opens from the pair's name.
 - **No rail on the page.** No word of a room, rail, operator, covenant or atom; the
   extension's `test/market/drive.mjs` reads the page's words in user mode.
 
@@ -216,8 +237,9 @@ link and tile are added by script then.
 ## What the site is
 
 Static ES modules, no bundler, no framework (house style). Served at
-`https://sequentiatestnet.com/dex/`. Pages: `index.html` (the default view's
-markets), and in the developer view `rooms.html` (the room chooser), `lndex.html`,
+`https://sequentiatestnet.com/dex/`. Pages: `index.html`, `market.html` and
+`portfolio.html` (the default view's markets, a pair and the portfolio), and in
+the developer view `rooms.html` (the room chooser), `lndex.html`,
 `onchain.html`, `confidential.html`, `channels.html` and the developer-mode
 `leaves.html`, over a
 shared core (`shared/`): provider glue, asset metadata (registry + prices),
@@ -323,7 +345,7 @@ identifiers. The accent system is informational, not decorative: it encodes
 which settlement world the user is standing in.
 
 Charts are drawn with TradingView Lightweight Charts, vendored unmodified in
-`vendor/lightweight-charts` (Apache-2.0; a page that shows a chart shows its
+`shared/vendor/lightweight-charts` (Apache-2.0; a page that shows a chart shows its
 NOTICE with a link to TradingView, and each chart keeps the library's
 attribution logo). `shared/chart.js` holds the price chart (candles or a step
 line, with volume and indicators in panes of their own), the depth chart (the

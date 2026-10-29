@@ -5,15 +5,17 @@ contract (surfaces, books, settlement phases, provider dependencies).
 
 ## Rules
 
-- **Two views.** The default view (`index.html`) is one market per pair, its book
+- **Two views.** The default view is the markets (`index.html`, the Tickers panel),
+  a pair's terminal (`market.html`) and the portfolio (`portfolio.html`). A pair's book is
   merged from the orders the wallet settles in one step only: covenant orders and
   orders resting as leaves in an operator's tree (`resting_leaf`, listed at the relay's
   live size, `statuses[i].active_amount`) on `/seqob`, read both ways round (a
   reversed market's order is a bid), and, against
   BTC, the pure-Lightning quotes on `/seqob-pln` (`ln_direction` 2 or 3). Trades go
   through the wallet's rail-blind `placeOrder`, `getOrders` and `cancelOrder`; the
-  page names no rail, room, operator, covenant or atom, and shows prices and totals
-  in the reference currency. The developer view keeps the rooms separate and
+  pages name no rail, room, operator, covenant or atom; a price is the last trade in
+  the quote's units, totals are in the reference currency, and an order goes to the
+  wallet in the market's own direction (`orient`) however the pair is shown. The developer view keeps the rooms separate and
   unmerged: LNDEX (`/seqob-pln`, `lightning.ln_direction` 2 or 3 only), on-chain
   (`/seqob`), confidential (`/seqob-conf`, `pair.confidential == true` only), and
   the developer-mode leaves room. Never merge the rooms, and never let a rail word
@@ -46,7 +48,7 @@ contract (surfaces, books, settlement phases, provider dependencies).
   offers (4/5) are the web wallet's business, never shown here.
 - Confidential DEX never gets a BTC leg (Bitcoin has no CT).
 - Charts go through `shared/chart.js` and the vendored Lightweight Charts
-  (`vendor/lightweight-charts`, never edited; a new version replaces the file and
+  (`shared/vendor/lightweight-charts`, never edited; a new version replaces the file and
   its README's version and hash). A page that shows a chart shows `CHART_NOTICE`
   with its link, and the attribution logo stays on.
 - Static ES modules, no bundler. Surface accents are informational

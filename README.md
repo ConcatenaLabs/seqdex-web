@@ -14,14 +14,16 @@ DESIGN.md, "Wallets", describes the interface all of them speak, and the extensi
 
 The site has two views, and follows the wallet's mode to choose between them.
 
-**The default view** (`index.html`) is one market per pair of assets: pick a pair,
-read its book (every order the wallet can settle in one step, merged, with its
-depth) and its price chart, and trade with one form and one button, a market order
-or a limit order. The wallet chooses how each trade settles and shows what is given,
-got and paid, each in the reference currency, before anything is signed. Your open
-orders and your history sit under the book: an order rests until it is filled, and
-what is left of it can be taken back once its time has run out. Prices and totals are
-in the reference currency throughout, and BTC pairs come first.
+**The default view** is a trading terminal. **Markets** (`index.html`) lists every
+market priced every way round, grouped by asset, with its last price, 24-hour change
+and volume: choose an asset to price every market in it, or search. **A pair**
+(`market.html?pair=GOLD-USDX`) shows its price chart (candles or a line, ranges from
+a day to all, indicators, or the book's depth), the book and recent trades, an order
+ticket for market and limit orders, and your open orders, trades and history. The
+wallet chooses how each trade settles and shows what is given, got and paid before
+anything is signed; an order rests until it is filled, and what is left of it can be
+taken back once its time has run out. **Portfolio** (`portfolio.html`) shows one total
+in US dollars and each asset's one figure, your orders and your trades.
 
 **The developer view**, shown while the wallet is in developer mode, adds one room
 per way of settling, each with its own book, unmerged:
