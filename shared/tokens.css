@@ -36,7 +36,7 @@ button { font-family: var(--disp); cursor: pointer; }
 .wrap { max-width: 1180px; margin: 0 auto; padding: 0 22px 70px; }
 
 /* topbar */
-.topbar {
+.topbar { position: relative;
   display: flex; align-items: center; gap: 26px; flex-wrap: wrap;
   padding: 16px 0; margin-bottom: 26px;
   border-bottom: 1px solid var(--line);
@@ -80,6 +80,22 @@ button { font-family: var(--disp); cursor: pointer; }
 .connect-btn .st { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
 .connect-btn.ok .st { background: var(--green); }
 .connect-btn .addr { font-family: var(--mono); font-size: 12px; color: var(--dim); }
+/* The chooser under the connect button: one row per wallet this site connects to. */
+.connect-menu {
+  position: absolute; right: 16px; top: calc(100% + 6px); z-index: 20; min-width: 260px;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 10px;
+  display: flex; flex-direction: column; gap: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+.connect-menu[hidden] { display: none; }
+.connect-menu > p { margin: 0 4px 2px; font-size: 12px; }
+.connect-opt {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px; width: 100%;
+  border: 1px solid var(--line); background: var(--panel); color: var(--txt);
+  border-radius: 10px; padding: 10px 12px; font: inherit; text-align: left; cursor: pointer;
+}
+.connect-opt:hover { border-color: var(--accent); }
+.connect-opt.on { border-color: var(--green); }
+.connect-opt .faint { font-size: 12px; white-space: nowrap; }
 
 /* panels */
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }

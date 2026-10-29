@@ -61,7 +61,7 @@ function drawAbsent() {
   document.title = 'SeqDEX';
   room.appendChild(el('p', 'sub', P.hasWallet()
     ? 'Nothing here in the wallet’s current mode.'
-    : 'Nothing here without the Sequentia wallet extension.'));
+    : 'Nothing here without a wallet.'));
 }
 
 function panel(title, id) {

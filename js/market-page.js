@@ -345,7 +345,7 @@ export async function runMarketPage() {
       params = { type, base: p.base, quote: p.quote, side, amount: amount.toString() };
       if (type === 'limit') params.price = priceAtoms($('fPrice').value, prec(p.quote)).toString();
     } catch (e) { st.className = 'status err'; st.textContent = e.message; return; }
-    if (!P.hasWallet()) { st.className = 'status err'; st.textContent = 'Trading needs the Sequentia wallet extension.'; return; }
+    if (!P.hasWallet()) { st.className = 'status err'; st.textContent = P.NO_WALLET; return; }
     busy = true; go.disabled = true;
     try {
       if (!P.account()) await P.connect();
@@ -373,7 +373,7 @@ export async function runMarketPage() {
     box.textContent = '';
     box.appendChild(el('h2', null, 'Your balances'));
     if (!P.account()) {
-      box.appendChild(el('p', 'sub', P.hasWallet() ? 'Connect the wallet to see your balances.' : 'Trading needs the Sequentia wallet extension.'));
+      box.appendChild(el('p', 'sub', P.hasWallet() ? 'Connect the wallet to see your balances.' : P.NO_WALLET));
       return;
     }
     let b;

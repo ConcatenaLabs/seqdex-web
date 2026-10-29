@@ -3,6 +3,8 @@ import * as P from './provider.js';
 import { loadMeta } from './meta.js';
 
 export const $ = (id) => document.getElementById(id);
+const DOWNLOADS = 'https://sequentiatestnet.com/download/';
+const LOCAL_HELP = 'https://github.com/ConcatenaLabs/sequentia-connect#readme';
 export const el = (t, c, txt) => {
   const e = document.createElement(t);
   if (c) e.className = c;
@@ -97,34 +99,69 @@ export async function initChrome(active) {
 
   const btn = el('button', 'connect-btn');
   btn.id = 'btnConnect';
+  btn.type = 'button';
   bar.appendChild(btn);
   renderConnect(btn, null, P.hasWallet());
 
-  P.onAccountChange((acc) => renderConnect(btn, acc, P.hasWallet()));
-  btn.onclick = async () => {
-    if (!P.hasWallet()) {
-      window.open('https://sequentiatestnet.com/download/', '_blank', 'noopener');
-      return;
+  // The chooser: every wallet this site connects to, each with whether it is there.
+  const menu = el('div', 'connect-menu');
+  menu.id = 'connectMenu';
+  menu.hidden = true;
+  bar.appendChild(menu);
+  const drawMenu = async () => {
+    menu.textContent = '';
+    menu.appendChild(el('p', 'faint', 'Connect with'));
+    for (const c of P.connectors()) {
+      const there = await c.available().catch(() => false);
+      const row = el('button', 'connect-opt' + (P.activeConnector() === c && P.account() ? ' on' : ''));
+      row.type = 'button';
+      row.dataset.connector = c.id;
+      row.appendChild(el('b', null, c.label));
+      row.appendChild(el('span', 'faint', there ? (P.activeConnector() === c && P.account() ? 'Connected' : 'Ready') : (c.id === 'local' ? 'Not running' : 'Not installed')));
+      row.onclick = async () => {
+        if (!there) {
+          window.open(c.id === 'local' ? LOCAL_HELP : DOWNLOADS, '_blank', 'noopener');
+          return;
+        }
+        menu.hidden = true;
+        btn.disabled = true;
+        try { if (P.activeConnector() !== c) await P.choose(c.id); await P.connect(); clearWarning(); }
+        catch (e) { showWarning(bar, 'Could not connect: ' + e.message); }
+        finally { btn.disabled = false; }
+      };
+      menu.appendChild(row);
     }
-    if (P.account()) return;
-    btn.disabled = true;
-    try { await P.connect(); clearWarning(); }
-    catch (e) { showWarning(bar, 'Could not connect: ' + e.message); }
-    finally { btn.disabled = false; }
   };
 
-  // No provider means no trading at all; say so plainly, with the way out.
+  P.onAccountChange((acc) => renderConnect(btn, acc, P.hasWallet()));
+  P.onPresence(() => renderConnect(btn, P.account(), P.hasWallet()));
+  btn.onclick = async () => {
+    if (!menu.hidden) { menu.hidden = true; return; }
+    await drawMenu();
+    menu.hidden = false;
+  };
+  document.addEventListener('click', (e) => { if (!menu.hidden && !menu.contains(e.target) && e.target !== btn && !btn.contains(e.target)) menu.hidden = true; });
+
+  // No wallet means no trading at all; say so plainly, with the ways in.
   let note = null;
-  if (!P.hasWallet()) {
+  const drawNote = () => {
+    if (P.hasWallet()) { if (note) { note.remove(); note = null; } return; }
+    if (note) return;
     note = el('div', 'extnote');
-    note.appendChild(el('b', null, 'SeqDEX needs the Sequentia wallet extension. '));
-    note.appendChild(document.createTextNode('Every order and every settlement is signed inside the extension; this site never holds keys or funds. Get the extension from the '));
+    note.appendChild(el('b', null, 'SeqDEX needs a wallet. '));
+    note.appendChild(document.createTextNode('Every order and every settlement is signed inside your wallet; this site never holds keys or funds. Use the Sequentia wallet extension (from the '));
     const dl = el('a', null, 'downloads page');
-    dl.href = 'https://sequentiatestnet.com/download/'; dl.target = '_blank'; dl.rel = 'noopener';
+    dl.href = DOWNLOADS; dl.target = '_blank'; dl.rel = 'noopener';
     note.appendChild(dl);
-    note.appendChild(document.createTextNode(', install it in a Chromium browser (Chrome, Brave, Edge), then reload this page.'));
+    note.appendChild(document.createTextNode(', in a Chromium browser), or your own Sequentia Core through '));
+    const lc = el('a', null, 'sequentia-connect');
+    lc.href = LOCAL_HELP; lc.target = '_blank'; lc.rel = 'noopener';
+    note.appendChild(lc);
+    note.appendChild(document.createTextNode(', then reload this page.'));
     bar.parentNode.insertBefore(note, bar.nextSibling);
-  }
+  };
+  drawNote();
+  P.onPresence(drawNote);
 
   // Everything that needs the provider object runs through onProvider, which
   // fires now if the extension is already injected and otherwise on its
@@ -133,14 +170,20 @@ export async function initChrome(active) {
   // goes, the button flips to "Connect wallet", events are watched, and a
   // silent restore picks up an existing session.
   let restored = Promise.resolve(null);
-  P.onProvider(() => {
-    if (note) { note.remove(); note = null; }
+  const wire = () => {
+    drawNote();
     renderConnect(btn, P.account(), true);
     P.watchEvents();
     restored = P.restore();
     P.walletMode().then(showDev).catch(() => {});
     P.onEvent('modeChanged', (d) => showDev(d && d.mode));
-  });
+  };
+  P.onProvider(wire);
+  // Another wallet chosen: its session, its mode and its events, the same way.
+  P.onChoose(() => P.onProvider(wire));
+  // The daemon on this computer is looked for once at load; wait for that look, so a
+  // page whose wallet is the daemon renders its connected state on first paint.
+  await P.localReady;
 
   // When the provider is already there, onProvider has fired synchronously and
   // the restore is awaited so a page can render its connected state on first
@@ -168,19 +211,14 @@ function renderConnect(btn, acc, walletPresent) {
   btn.textContent = '';
   const st = el('span', 'st'); btn.appendChild(st);
   btn.classList.toggle('ok', !!acc);
-  if (!walletPresent) {
-    btn.appendChild(document.createTextNode('Install the wallet'));
-    btn.title = 'SeqDEX needs the Sequentia browser extension wallet';
-    return;
-  }
   if (acc) {
     btn.appendChild(document.createTextNode('Connected'));
     const a = el('span', 'addr', acc.address.slice(0, 10) + '…' + acc.address.slice(-4));
     btn.appendChild(a);
-    btn.title = acc.address;
+    btn.title = acc.address + ' · ' + P.activeConnector().label;
   } else {
-    btn.appendChild(document.createTextNode('Connect wallet'));
-    btn.title = 'Connect the Sequentia extension wallet';
+    btn.appendChild(document.createTextNode(walletPresent ? 'Connect wallet' : 'Get a wallet'));
+    btn.title = 'The Sequentia wallet extension, or Sequentia Core on this computer';
   }
 }
 
