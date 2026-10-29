@@ -4,7 +4,7 @@
 // call goes to the wallet, which asks its owner. Only the methods this site actually
 // uses get a wrapper: anything that touches UTXOs, PSETs or invoices is the wallet's
 // business and stays out of this file so it can never be called from here by accident.
-import { extensionConnector, localConnector, railsOf, LOCAL_DEFAULT_URL } from './connectors.js';
+import { extensionConnector, localConnector, webWalletConnector, remoteConnector, railsOf, LOCAL_DEFAULT_URL } from './connectors.js';
 
 const CHOICE_KEY = 'seqdex.connector';
 // The daemon's address: its default port, or another on this computer's loopback
@@ -22,7 +22,9 @@ function localUrl() {
   } catch { /* no storage: the default port */ }
   return LOCAL_DEFAULT_URL;
 }
-const CONNECTORS = { extension: extensionConnector(), local: localConnector({ url: localUrl() }) };
+// The web wallet lives on this origin at /wallet/ (the site at /dex/).
+const CONNECTORS = { extension: extensionConnector(), local: localConnector({ url: localUrl() }),
+  webwallet: webWalletConnector({ url: '/wallet/' }), phone: remoteConnector({ name: 'SeqDEX' }) };
 
 let cachedAccount = null;
 const listeners = new Set();
@@ -32,14 +34,18 @@ function storedChoice() {
   try { const v = localStorage.getItem(CHOICE_KEY); return CONNECTORS[v] ? v : null; } catch { return null; }
 }
 // The connector in use: the one the person chose last; else the extension when it is
-// installed; else the daemon on this computer once it answers.
+// installed; else the daemon on this computer once it answers; else an open web wallet; else
+// a paired phone.
 let chosen = storedChoice();
 function active() {
   if (chosen) return CONNECTORS[chosen];
   if (CONNECTORS.extension.present()) return CONNECTORS.extension;
   if (CONNECTORS.local.present()) return CONNECTORS.local;
+  if (CONNECTORS.webwallet.present()) return CONNECTORS.webwallet;
+  if (CONNECTORS.phone.present()) return CONNECTORS.phone;
   return CONNECTORS.extension;
 }
+export function connectorById(id) { return CONNECTORS[id] || null; }
 
 export function connectors() { return Object.values(CONNECTORS); }
 export function activeConnector() { return active(); }
@@ -78,8 +84,11 @@ function assertGenuine() {
     let caps;
     try { caps = await conn.request('getCapabilities', {}); }
     catch (e) { throw new Error('the wallet did not identify itself: ' + (e && e.message ? e.message : e)); }
-    if (!caps || caps.provider !== conn.identity) {
-      throw new Error('refusing an unrecognised wallet on this page; install the Sequentia wallet extension or start sequentia-connect, then reload');
+    // A paired wallet is bound by its pairing's secret and names itself; every other connector
+    // must answer as the one it was chosen as.
+    const ok = caps && (conn.identity ? caps.provider === conn.identity : typeof caps.provider === 'string' && caps.provider.length > 0);
+    if (!ok) {
+      throw new Error('refusing an unrecognised wallet on this page; choose your wallet again from Connect wallet, then reload');
     }
     return caps;
   })();
@@ -88,9 +97,16 @@ function assertGenuine() {
   return p;
 }
 
+const NOT_THERE = {
+  local: 'Sequentia Core on this computer is not answering',
+  extension: 'Ambra browser is not installed',
+  webwallet: 'the web wallet is not open: open it in another tab, then try again',
+  phone: 'no wallet is paired: pair one from the Connect wallet menu',
+};
 export async function request(method, params = {}) {
   const conn = active();
-  if (!conn.present()) throw new Error(conn.id === 'local' ? 'Sequentia Core on this computer is not answering' : 'the Sequentia wallet extension is not installed');
+  if (!conn.present() && conn.id === 'webwallet') await conn.available();
+  if (!conn.present()) throw new Error(NOT_THERE[conn.id] || 'the wallet is not there');
   if (method !== 'getCapabilities') await assertGenuine();
   return await conn.request(method, params);
 }
@@ -152,8 +168,22 @@ const wantsLocal = () => chosen === 'local' || (!chosen && !CONNECTORS.extension
 // The extension's inpage script runs before the page's own, so whether it is there is
 // known at load; one that lands later is announced by its event.
 export const localReady = wantsLocal() ? probeLocal() : Promise.resolve(false);
+// The web wallet answers on the channel at once, when a wallet page is open: looked for when it
+// is the wallet chosen, or while no wallet is there at all.
+async function probeWebWallet() {
+  const was = CONNECTORS.webwallet.present();
+  const ok = await CONNECTORS.webwallet.available();
+  if (ok !== was) emitPresence();
+  fireReady();
+  return ok;
+}
+export const webWalletReady = (chosen === 'webwallet' || (!chosen && !CONNECTORS.extension.present())) ? probeWebWallet() : Promise.resolve(false);
+export const probeWebWalletNow = probeWebWallet;
 export const probeLocalNow = probeLocal;
-if (typeof setInterval !== 'undefined') setInterval(() => { if (wantsLocal()) probeLocal(); }, 5000);
+if (typeof setInterval !== 'undefined') setInterval(() => {
+  if (wantsLocal()) probeLocal();
+  if (!CONNECTORS.webwallet.present() && (chosen === 'webwallet' || (!chosen && !hasWallet()))) probeWebWallet();
+}, 5000);
 
 const watched = new WeakSet();
 export function watchEvents() {
@@ -193,7 +223,7 @@ export async function rails() {
 }
 
 // The words a page uses when no wallet is there to trade with.
-export const NO_WALLET = 'Trading needs a wallet: the Sequentia wallet extension, or Sequentia Core on this computer through sequentia-connect.';
+export const NO_WALLET = 'Trading needs a wallet: the Sequentia web wallet, Ambra mobile, Ambra browser, or Sequentia Core on this computer through sequentia-connect.';
 
 // ---- typed helpers over the raw protocol (only what the site calls) ----
 export const getBalances = () => request('getBalances');

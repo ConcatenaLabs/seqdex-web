@@ -34,7 +34,9 @@ function units(atoms, h) {
 function priceText(p, quote) {
   const q = priceUsd(quote);
   if (q > 0) return usd(p * q);
-  return p.toPrecision(6).replace(/\.?0+$/, '') + ' ' + tk(quote);
+  // Trailing zeros go only after a decimal point: 100000 stays 100000.
+  const t = p >= 1e5 ? String(Math.round(p)) : p.toPrecision(6);
+  return (t.includes('.') && !t.includes('e') ? t.replace(/\.?0+$/, '') : t) + ' ' + tk(quote);
 }
 function totalText(atoms, quote) {
   const v = usdFor(quote, atoms);
@@ -63,6 +65,21 @@ async function relayList(mount, base, quote, what) {
   catch { return []; }
 }
 
+// What the wallet holds of each asset, one figure as the wallet shows it: its `total` where it
+// answers one (getCapabilities' 'balances-total'), else its coins on the chain and its leaves
+// (getBalances' `leaves`), and BTC on the chain.
+export function spendableOf(b) {
+  if (b && b.total && typeof b.total === 'object') return { ...b.total };
+  const out = {};
+  if (b && b.btc != null) out.BTC = String(b.btc);
+  for (const part of [b && b.assets, b && b.leaves]) {
+    for (const [h, v] of Object.entries(part || {})) {
+      try { out[h] = (BigInt(out[h] || 0) + BigInt(v || 0)).toString(); } catch {}
+    }
+  }
+  return out;
+}
+
 export async function runMarketPage() {
   let pairs = [], current = null, book = null, side = 'buy', type = 'market';
   let busy = false, picked = false;
@@ -75,7 +92,7 @@ export async function runMarketPage() {
     if (!P.account()) return [];
     try {
       const b = await P.getBalances();
-      return Object.entries(b.assets || {}).filter(([h, v]) => BigInt(v || 0) > 0n && assetMeta(h).ticker && !assetMeta(h).ticker.endsWith('…')).map(([h]) => h);
+      return Object.entries(spendableOf(b)).filter(([h]) => h !== 'BTC').filter(([h, v]) => BigInt(v || 0) > 0n && assetMeta(h).ticker && !assetMeta(h).ticker.endsWith('…')).map(([h]) => h);
     } catch { return []; }
   }
   async function loadPairs() {
@@ -379,7 +396,7 @@ export async function runMarketPage() {
     let b;
     try { b = await P.getBalances(); } catch (e) { box.appendChild(el('p', 'sub', 'The wallet is locked or unreachable: ' + e.message)); return; }
     for (const h of [current.base, current.quote]) {
-      const atoms = h === 'BTC' ? (b.btc || '0') : ((b.assets || {})[h] || '0');
+      const atoms = spendableOf(b)[h] || '0';
       const r = el('div', 'wrow');
       r.appendChild(el('span', 'tk', tk(h)));
       r.appendChild(el('span', 'amt', units(atoms, h)));

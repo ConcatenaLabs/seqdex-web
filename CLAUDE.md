@@ -38,7 +38,8 @@ contract (surfaces, books, settlement phases, provider dependencies).
   primitive, then consume it here.
 - **Pages never ask which wallet is connected.** Every call goes through
   `shared/provider.js` to the chosen connector (`shared/connectors.js`: the
-  extension, or `sequentia-connect` on the loopback address); a page asks what
+  extension, `sequentia-connect` on the loopback address, the web wallet over
+  its channel, or a paired phone over a relay); a page asks what
   the wallet serves (`supports`, `rails`) and offers only that. A new connector
   is a new entry there, never a branch in a page.
 - LNDEX = pure LN only. Submarine offers (ln_direction 0/1) and sub-asset
@@ -61,7 +62,9 @@ the merged book, the chart's series, typed amounts; `shared/market-book.js`) and
 leaves room's reading of the relay's book and fill records (`shared/leaf-room.js`,
 covenant orders and resting orders), and the pools room's reading of pools and
 clearing rounds (`shared/pool-room.js`, both orientations of a pool's two sides),
-the wallet connectors (`shared/connectors.js`: rail groups, sessions), and the
+the wallet connectors (`shared/connectors.js`: rail groups, sessions; the web
+wallet's channel and a phone's pairing, `test/pairing.test.mjs`, with real NIP-44
+encryption over an in-memory relay), and the
 charts (`shared/chart.js`: ranges, filled candles, depth sampling, the seven-day
 line) and their indicators (`shared/indicators.js`), and the Tickers panel's
 rows (`shared/tickers.js`: each market both ways round, grouped by base, an
@@ -71,7 +74,9 @@ End to end, each with the extension and a relay on a private chain, the extensio
 the leaves room, and its `test/resting/drive.mjs` orders resting in the operator's
 tree through both views; all serve this checkout as the site. With your own stack,
 `sequentia-connect`'s `test/regtest/site-drive.mjs` drives the default view through
-the daemon (two Core wallets, two daemons, a limit order placed and taken).
+the daemon (two Core wallets, two daemons, a limit order placed and taken). Through the
+web wallet, its `tooling/seqdex-bridge-drive.mjs` drives the default view on the live
+testnet (both served by its `tooling/live-proxy.mjs --dex <this checkout>`).
 
 ## Deploy
 

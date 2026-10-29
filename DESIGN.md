@@ -2,10 +2,11 @@
 
 The standalone SeqDEX website. It has no wallet of its own: every key
 operation goes through the wallet the person connects, behind one interface
-(see "Wallets" below): the Sequentia browser extension (repo
-`sequentia-extension`, `window.sequentia`), or the person's own Sequentia Core,
-Lightning node and leaf wallet through the `sequentia-connect` daemon on their
-computer (repo `sequentia-connect`). Both speak the same protocol:
+(see "Wallets" below): the Sequentia web wallet in another tab of this origin, a
+wallet on a phone paired by a QR code (Ambra mobile), Ambra browser (the extension,
+repo `sequentia-extension`, `window.sequentia`), or the person's own Sequentia
+Core, Lightning node and leaf wallet through the `sequentia-connect` daemon on
+their computer (repo `sequentia-connect`). All speak the same protocol:
 [`sequentia-extension/doc/PROVIDER.md`](https://github.com/ConcatenaLabs/sequentia-extension/blob/master/doc/PROVIDER.md).
 The site has two views. The default view is one market per pair, its book merged
 from the orders the wallet can settle in one step, and the wallet chooses how each
@@ -253,8 +254,27 @@ filled from leaves, orders resting as leaves, pools), and offer only that.
   payments (SeqLN or CLN), and in developer mode the leaf wallet's balances and
   receive requests.
 
-The connect button opens a chooser with both, each marked Ready, Not installed or
-Not running. The choice is kept in the browser; with none made, the extension is
+- **The web wallet** (`webwallet`): the Sequentia web wallet open in another tab or
+  window of this origin (`/wallet/`), over the `BroadcastChannel` named
+  `sequentia-wallet` (the extension's `doc/PAIRING.md`, "Same origin"). It must
+  answer `getCapabilities` with `provider: 'sequentia-web-wallet'`. The site says
+  hello, talks to the one wallet page that answered first, and opens the wallet in a
+  window of its own when none is open; the wallet page shows its owner the
+  connection and each order in its own dialog. It serves the account and the
+  default view's market and limit orders, settled as its Trade tab settles a trade.
+- **A wallet on a phone** (`phone`): any wallet that pairs by the extension's
+  `doc/PAIRING.md`, "Another device" (Ambra): the site shows a `nostrconnect://`
+  pairing code with a one-time secret and the relays to meet on
+  (`PAIR_RELAYS`), as a QR code and as a link for a wallet app on the same phone;
+  the wallet that answers the secret is paired, and every request after that is an
+  encrypted event between the two keys only (NIP-44, through
+  `shared/vendor/nostr-tools.js`). Its `getCapabilities` names it (no fixed
+  `provider`: the pairing binds it). The pairing is kept in the browser until it is
+  forgotten from the chooser or the wallet sends `disconnect`.
+
+The connect button opens a chooser with all four, each marked Ready, Connected,
+Not open (the web wallet), Pair or Paired (a phone), Not installed or Not
+running. The choice is kept in the browser; with none made, the extension is
 used when it is installed, else the daemon once it answers. The daemon's port is
 looked for only when it is the chosen wallet, while no wallet is there at all,
 and when the chooser opens: a page whose wallet is the extension never knocks on
@@ -278,7 +298,8 @@ land there first, then in `sequentia-connect` for what it serves):
   `modeChanged`, `leafTake` and `leafArrived` events.
 - Also called, silently: `getCapabilities`, before any other method, so the
   site refuses a wallet that does not identify itself as the connector it was
-  chosen as (`sequentia-wallet-extension` or `sequentia-connect`; any page
+  chosen as (`sequentia-wallet-extension`, `sequentia-connect` or
+`sequentia-web-wallet`; a phone by its pairing's secret; any page
   script can define a `window.sequentia` of its own);
   and `getWalletMode` on every page, which decides whether the leaves room's
   link and tile are drawn.

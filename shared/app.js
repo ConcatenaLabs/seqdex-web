@@ -5,6 +5,9 @@ import { loadMeta } from './meta.js';
 export const $ = (id) => document.getElementById(id);
 const DOWNLOADS = 'https://sequentiatestnet.com/download/';
 const LOCAL_HELP = 'https://github.com/ConcatenaLabs/sequentia-connect#readme';
+// What a chooser row says of a wallet that is not there (the web wallet's docs/DEFAULT_MODE.md,
+// "Connect").
+const NOT_THERE_WORD = { extension: 'Not installed', local: 'Not running', webwallet: 'Not open', phone: 'Pair' };
 export const el = (t, c, txt) => {
   const e = document.createElement(t);
   if (c) e.className = c;
@@ -117,9 +120,21 @@ export async function initChrome(active) {
       row.type = 'button';
       row.dataset.connector = c.id;
       row.appendChild(el('b', null, c.label));
-      row.appendChild(el('span', 'faint', there ? (P.activeConnector() === c && P.account() ? 'Connected' : 'Ready') : (c.id === 'local' ? 'Not running' : 'Not installed')));
+      row.appendChild(el('span', 'faint', there ? (P.activeConnector() === c && P.account() ? 'Connected' : (c.id === 'phone' ? 'Paired' : 'Ready')) : NOT_THERE_WORD[c.id]));
       row.onclick = async () => {
-        if (!there) {
+        if (!there && c.id === 'webwallet') {
+          // Opened beside this page; connected once it answers (its owner unlocks it there).
+          c.open();
+          menu.hidden = true;
+          showWarning(bar, 'Open your web wallet in the new tab, then choose it here again.', 'info');
+          const t0 = Date.now();
+          while (Date.now() - t0 < 120000 && !(await c.available().catch(() => false))) await new Promise((r) => setTimeout(r, 1500));
+          if (!c.present()) return;
+          clearWarning();
+        } else if (!there && c.id === 'phone') {
+          menu.hidden = true;
+          if (!(await pairPhone(c))) return;
+        } else if (!there) {
           window.open(c.id === 'local' ? LOCAL_HELP : DOWNLOADS, '_blank', 'noopener');
           return;
         }
@@ -129,6 +144,12 @@ export async function initChrome(active) {
         catch (e) { showWarning(bar, 'Could not connect: ' + e.message); }
         finally { btn.disabled = false; }
       };
+      // A paired phone can be forgotten from here.
+      if (c.id === 'phone' && there) {
+        const f = el('a', 'faint forget', 'Forget'); f.href = '#'; f.id = 'phoneForget';
+        f.onclick = (e) => { e.preventDefault(); e.stopPropagation(); c.forget(); menu.hidden = true; if (P.activeConnector() === c) P.choose(c.id); };
+        row.appendChild(f);
+      }
       menu.appendChild(row);
     }
   };
@@ -149,7 +170,11 @@ export async function initChrome(active) {
     if (note) return;
     note = el('div', 'extnote');
     note.appendChild(el('b', null, 'SeqDEX needs a wallet. '));
-    note.appendChild(document.createTextNode('Every order and every settlement is signed inside your wallet; this site never holds keys or funds. Use the Sequentia wallet extension (from the '));
+    note.appendChild(document.createTextNode('Every order and every settlement is signed inside your wallet; this site never holds keys or funds. Use the '));
+    const ww = el('a', null, 'Sequentia web wallet');
+    ww.href = '/wallet/'; ww.target = 'sequentia-web-wallet';
+    note.appendChild(ww);
+    note.appendChild(document.createTextNode(', Ambra mobile (Connect wallet, then pair it), Ambra browser (from the '));
     const dl = el('a', null, 'downloads page');
     dl.href = DOWNLOADS; dl.target = '_blank'; dl.rel = 'noopener';
     note.appendChild(dl);
@@ -183,7 +208,7 @@ export async function initChrome(active) {
   P.onChoose(() => P.onProvider(wire));
   // The daemon on this computer is looked for once at load; wait for that look, so a
   // page whose wallet is the daemon renders its connected state on first paint.
-  await P.localReady;
+  await Promise.all([P.localReady, P.webWalletReady]);
 
   // When the provider is already there, onProvider has fired synchronously and
   // the restore is awaited so a page can render its connected state on first
@@ -192,12 +217,46 @@ export async function initChrome(active) {
   return P.account();
 }
 
+// Pairing a wallet on a phone: a QR code to scan, and the same as a link for a wallet app on
+// this phone. Resolves true once the wallet answered (its owner approved the pairing there).
+async function pairPhone(c) {
+  const box = el('div', 'pair-modal'); box.id = 'pairModal';
+  const card = el('div', 'pair-card');
+  card.appendChild(el('h2', null, 'Pair Ambra mobile'));
+  card.appendChild(el('p', 'sub', 'Scan this code with Ambra mobile (Settings, Connect to a site), or open the link on the phone Ambra mobile is on. Ambra mobile shows this site and asks you to approve.'));
+  const qr = el('div', 'pair-qr'); qr.id = 'pairQr';
+  card.appendChild(qr);
+  const link = el('a', 'pair-link', 'Open in Ambra mobile on this phone'); link.id = 'pairLink';
+  card.appendChild(link);
+  const st = el('p', 'status'); st.id = 'pairStatus'; st.textContent = 'Waiting for your wallet…';
+  card.appendChild(st);
+  const cancel = el('button', 'btn ghost small', 'Cancel'); cancel.type = 'button';
+  card.appendChild(cancel);
+  box.appendChild(card);
+  document.body.appendChild(box);
+  try {
+    const { uri, paired } = await c.pair();
+    link.href = uri;
+    box.dataset.uri = uri;
+    const { default: qrcode } = await import('./vendor/qrcode.mjs');
+    const q = qrcode(0, 'L'); q.addData(uri); q.make();
+    qr.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+    const ok = await Promise.race([paired.then(() => true), new Promise((r) => { cancel.onclick = () => r(false); })]);
+    if (!ok) c.forget();
+    return ok;
+  } catch (e) {
+    st.className = 'status err'; st.textContent = 'Could not start the pairing: ' + e.message;
+    await new Promise((r) => { cancel.onclick = r; });
+    return false;
+  } finally { box.remove(); }
+}
+
 // One notice under the topbar for a failed connect: a user's rejection, a
 // locked wallet, or a provider that did not identify itself as the Sequentia
 // extension. Replaced on the next attempt, removed on success.
-function showWarning(bar, text) {
+function showWarning(bar, text, kind = 'warn') {
   clearWarning();
-  const w = el('div', 'extnote warn', text);
+  const w = el('div', 'extnote ' + kind, text);
   w.id = 'connectWarning';
   w.setAttribute('role', 'alert');
   bar.parentNode.insertBefore(w, bar.nextSibling);
@@ -218,7 +277,7 @@ function renderConnect(btn, acc, walletPresent) {
     btn.title = acc.address + ' · ' + P.activeConnector().label;
   } else {
     btn.appendChild(document.createTextNode(walletPresent ? 'Connect wallet' : 'Get a wallet'));
-    btn.title = 'The Sequentia wallet extension, or Sequentia Core on this computer';
+    btn.title = 'The Sequentia web wallet, Ambra mobile, Ambra browser, or Sequentia Core on this computer';
   }
 }
 

@@ -299,3 +299,13 @@ p.est { margin-top: 8px; min-height: 1.5em; }
 .pill.state-settled { color: var(--green); border-color: var(--green); }
 .pill.state-sent, .pill.state-returned { color: var(--dim); border-color: var(--line); }
 .pill.state-failed { color: var(--red); border-color: var(--red); }
+
+/* Pairing a wallet on a phone: the code to scan, over the page. */
+.pair-modal { position: fixed; inset: 0; background: rgba(0, 0, 0, .55); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+.pair-card { background: var(--panel, #fff); color: inherit; border-radius: 12px; padding: 20px; max-width: 360px; width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.pair-card h2 { margin: 0; font-size: 18px; }
+.pair-qr { background: #fff; border-radius: 8px; padding: 8px; align-self: center; width: 240px; max-width: 100%; }
+.pair-qr svg { display: block; width: 100%; height: auto; }
+.pair-link { word-break: break-all; font-size: 13px; }
+.extnote.info { border-left-color: var(--accent); }
+.connect-opt .forget { margin-left: 8px; }
