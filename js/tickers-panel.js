@@ -7,6 +7,7 @@ import { assetMeta, priceUsd } from '../shared/meta.js';
 import { MOUNTS } from '../shared/book.js';
 import { ANY, tickerGroups, anchorsOf, TICKER_WORDS as W } from '../shared/tickers.js';
 import { sparkSvg } from '../shared/chart.js';
+import { go } from './nav.js';
 
 const POLL_MS = 15_000;
 const FAV_KEY = 'seqdex.favourites';
@@ -73,7 +74,7 @@ export function mountTickers(host, opts = {}) {
   host.appendChild(box);
   const status = el('p', 't-empty'); status.hidden = true; host.appendChild(status);
 
-  const pick = opts.onPick || ((r) => { location.href = 'market.html?pair=' + encodeURIComponent(pairParam(r.base, r.quote)); });
+  const pick = opts.onPick || ((r) => go('market.html?pair=' + encodeURIComponent(pairParam(r.base, r.quote))));
   q.addEventListener('input', () => { search = q.value; draw(); });
   sel.addEventListener('change', () => { anchor = sel.value; draw(); });
 
@@ -123,15 +124,16 @@ export function mountTickers(host, opts = {}) {
     status.hidden = groups.length > 0;
     status.textContent = tickers.length ? W.none : 'Loading markets…';
   }
+  let stopped = false;
   async function load() {
     try { tickers = await fetchTickers(); }
     catch { if (!tickers.length) { status.hidden = false; status.textContent = 'The markets are unreachable right now.'; } return; }
+    if (stopped) return;
     fillAnchors();
     draw();
     if (opts.onData) opts.onData(tickers);
   }
   load();
   const timer = setInterval(load, POLL_MS);
-  window.addEventListener('pagehide', () => clearInterval(timer));
-  return { redraw: draw, tickers: () => tickers };
+  return { redraw: draw, tickers: () => tickers, stop: () => { stopped = true; clearInterval(timer); } };
 }

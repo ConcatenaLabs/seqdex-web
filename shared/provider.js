@@ -33,6 +33,12 @@ const chooseListeners = new Set();
 function storedChoice() {
   try { const v = localStorage.getItem(CHOICE_KEY); return CONNECTORS[v] ? v : null; } catch { return null; }
 }
+// Disconnected by the person (the menu's Disconnect): no wallet is asked again, silently or
+// otherwise, until they connect one, in this tab or any other.
+function storedDisconnect() {
+  try { return localStorage.getItem(CHOICE_KEY) === 'none'; } catch { return false; }
+}
+let disconnected = storedDisconnect();
 // The connector in use: the one the person chose last; else the extension when it is
 // installed; else the daemon on this computer once it answers; else an open web wallet; else
 // a paired phone.
@@ -56,6 +62,7 @@ export function onChoose(fn) { chooseListeners.add(fn); }
 export async function choose(id) {
   if (!CONNECTORS[id]) throw new Error('no such wallet connector: ' + id);
   chosen = id;
+  disconnected = false;
   try { localStorage.setItem(CHOICE_KEY, id); } catch {}
   genuine = null;
   cachedAccount = null;
@@ -114,7 +121,7 @@ export async function request(method, params = {}) {
 // Silent session restore: succeeds only if the origin is connected AND the
 // wallet is unlocked; never prompts.
 export async function restore() {
-  if (!hasWallet()) return null;
+  if (disconnected || !hasWallet()) { cachedAccount = null; emit(); return null; }
   try {
     const { accounts } = await request('getAccounts');
     cachedAccount = accounts && accounts[0] ? accounts[0] : null;
@@ -127,6 +134,12 @@ export async function restore() {
 // The identity check runs first, so an impostor never gets to show its own
 // "approval" dialog on the strength of a click meant for the real wallet.
 export async function connect() {
+  const conn = active();
+  if (disconnected) {
+    disconnected = false;
+    if (!chosen) { chosen = conn.id; }
+    try { localStorage.setItem(CHOICE_KEY, chosen); } catch {}
+  }
   cachedAccount = await request('connect');
   emit();
   return cachedAccount;
@@ -145,6 +158,19 @@ function fireReady() {
     try { fn(); } catch (e) { console.warn('[provider]', e); }
   }
 }
+// Disconnects this site from the wallet: the choice is forgotten here and in every other tab
+// (a reload asks no wallet), a session with Sequentia Core on this computer is dropped, a
+// paired phone is unpaired. The wallet itself keeps nothing of this site's to revoke beyond
+// that; Ambra browser's own Settings list the sites it trusts.
+export function disconnect() {
+  const conn = active();
+  try { if (conn.forget) conn.forget(); } catch {}
+  disconnected = true; chosen = null; genuine = null; cachedAccount = null;
+  try { localStorage.setItem(CHOICE_KEY, 'none'); } catch {}
+  emit();
+}
+export function isDisconnected() { return disconnected; }
+
 export function onProvider(fn) {
   pending.add(fn);
   fireReady();
