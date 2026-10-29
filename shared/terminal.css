@@ -85,6 +85,16 @@ table.t-tkr .star[aria-pressed="true"] { color: var(--gold); }
 .t-trades .row span:nth-child(3) { color: var(--faint); }
 .t-empty { padding: 14px 12px; color: var(--dim); font-size: 12.5px; }
 
+/* developer detail: each route's own book, and each trade's route */
+.t-routes { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 12px 2px; }
+.t-routes button { display: inline-flex; align-items: center; gap: 5px; font: 600 11.5px var(--disp); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: none; color: var(--dim); }
+.t-routes button::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--accent)); }
+.t-routes button[aria-pressed="true"] { color: var(--txt); border-color: var(--c, var(--accent)); }
+.t-routes button:disabled { opacity: .45; }
+.r-one { --c: #8fb8ff; } .r-covenant { --c: var(--gold); } .r-leaf { --c: var(--lime); } .r-pool { --c: #fb923c; } .r-ln { --c: var(--violet); }
+.t-trades.dev .row { grid-template-columns: 1fr 0.9fr 1.1fr 64px; }
+.t-trades .route { color: var(--dim); font-family: var(--disp); font-size: 11.5px; text-align: right; }
+
 /* the order ticket */
 .t-ticket { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .t-sides { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg); border-radius: 9px; padding: 3px; }

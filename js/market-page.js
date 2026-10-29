@@ -4,7 +4,7 @@
 // turned round for display when needed, and an order goes to the wallet in the market's
 // own direction, the one the makers post in (`orient`). The wallet chooses how each trade
 // settles (`placeOrder`); this page names none of the ways a trade can travel.
-import { $, el } from '../shared/app.js';
+import { $, el, developerView } from '../shared/app.js';
 import { assetMeta, assetByTicker, usdFor, priceUsd } from '../shared/meta.js';
 import { MOUNTS } from '../shared/book.js';
 import { orient, mergeBook, invertBook, remaindersOf, priceAtoms, amountAtoms, estimate, spendableOf } from '../shared/market-book.js';
@@ -16,6 +16,14 @@ import { mountTickers, fmtPrice, fmtUsd, tk, pairParam } from './tickers-panel.j
 import { drawOrders, units } from './orders-view.js';
 
 export { spendableOf };
+// Developer detail's names for the routes an order or a trade takes (the relay's rails).
+const RAIL_NAMES = {
+  'onchain-fill': 'on-chain covenant', 'covenant-round': 'covenant in a round', 'clearing-round': 'clearing round',
+  'leaf-resting': 'resting leaf', interactive: 'interactive', cross: 'cross-chain', lightning: 'Lightning',
+  'leaf-maker': 'in-tree maker', 'btc-gateway': 'BTC desk',
+};
+// The route of an offer of the one-step book.
+const routeOf = (o) => (o.resting_leaf ? 'leaf' : o.pool ? 'pool' : o.covenant ? 'covenant' : o.lightning ? 'ln' : 'other');
 const BOOK_POLL_MS = 10_000;
 const DATA_POLL_MS = 10_000;
 const ORDERS_POLL_MS = 10_000;
@@ -63,6 +71,8 @@ export async function runMarketPage() {
   let rangeKey = store.get(RANGE_KEY, '1W'), chartType = store.get(TYPE_KEY, 'candles');
   const shown = new Set(store.get(IND_KEY, INDICATORS.filter((i) => i.on).map((i) => i.key)));
   let groupStep = null, balances = {}, ordTab = 'open', lastCandle = null;
+  // Developer detail: the routes by name, each route's own book, each trade's route.
+  let dev = false, route = 'one', offersAll = [], bookOpts = null, lastTrades = [];
 
   // ---- the chart ----
   const priceChart = createPriceChart(LW, $('priceChart'), { type: chartType, indicators: shown });
@@ -185,12 +195,15 @@ export async function runMarketPage() {
     $('dayLine').textContent = parts.join(' · ');
   }
   function paintTrades(trades) {
+    lastTrades = trades;
     const box = $('trades'); box.textContent = '';
+    $('tradesPane').classList.toggle('dev', dev); $('htRoute').hidden = !dev;
     if (!trades.length) { box.appendChild(el('p', 't-empty', 'No trades yet')); return; }
     for (const t of trades.slice().reverse().slice(0, 40)) {
       const row = el('div', 'row');
       row.appendChild(el('span', t.side === 'sell' ? 'down' : 'up', fmtPrice(unit(t.price))));
       row.appendChild(el('span', null, units(String(t.size), view.base)));
+      if (dev) row.appendChild(el('span', 'route', RAIL_NAMES[t.rail] || t.rail || '-'));
       row.appendChild(el('span', null, new Date(t.ts * 1000).toTimeString().slice(0, 8)));
       box.appendChild(row);
     }
@@ -212,7 +225,9 @@ export async function runMarketPage() {
       offers = [...ab, ...ba]; opts.remainders = remaindersOf([...fab, ...fba]);
     }
     if (view !== v) return;
-    canonBook = mergeBook(offers, opts);
+    offersAll = offers; bookOpts = opts;
+    drawRoutes();
+    canonBook = mergeBook(route === 'one' ? offers : offers.filter((o) => routeOf(o) === route), opts);
     book = inv ? invertBook(canonBook) : canonBook;
     paintBook();
     if (viewMode === 'depth') drawDepth();
@@ -280,6 +295,29 @@ export async function runMarketPage() {
   }
   for (const b of $('bookTabs').querySelectorAll('button')) {
     b.onclick = () => { pressOne($('bookTabs'), b); const t = b.dataset.b === 'trades'; $('bookPane').hidden = t; $('tradesPane').hidden = !t; $('groupStep').style.visibility = t ? 'hidden' : 'visible'; };
+  }
+
+  // ---- developer detail: the book by route ----
+  function drawRoutes() {
+    const box = $('routeChips');
+    box.hidden = !dev;
+    if (!dev) { route = 'one'; return; }
+    const n = { covenant: 0, leaf: 0, pool: 0, ln: 0 };
+    for (const o of offersAll) { const r = routeOf(o); if (r in n) n[r]++; }
+    box.textContent = '';
+    for (const [k, label] of [['one', 'Settles in one step'], ['covenant', 'On-chain covenant'], ['leaf', 'Resting leaf'], ['pool', 'Pools'], ['ln', 'Lightning']]) {
+      if (k === 'ln' ? canon.quote !== 'BTC' : k !== 'one' && canon.quote === 'BTC') continue;
+      const b = el('button', 'r-' + k, k === 'one' ? label : label + ' ' + n[k]); b.type = 'button';
+      b.setAttribute('aria-pressed', route === k ? 'true' : 'false');
+      b.disabled = k !== 'one' && !n[k];
+      b.onclick = () => { route = k; groupStep = null; refreshBook(); };
+      box.appendChild(b);
+    }
+  }
+  async function readMode() {
+    const was = dev;
+    dev = developerView(await P.walletMode());
+    if (dev !== was && view) { drawRoutes(); paintTrades(lastTrades); if (!dev) refreshBook(); }
   }
 
   // ---- the order ticket ----
@@ -494,12 +532,13 @@ export async function runMarketPage() {
   }
   for (const b of $('ordTabs').querySelectorAll('button')) b.onclick = () => { ordTab = b.dataset.o; pressOne($('ordTabs'), b); refreshOrders(); };
   $('thisMarket').onchange = refreshOrders;
-  P.onAccountChange(() => { readBalances(); readFeatures(); refreshOrders(); });
+  P.onAccountChange(() => { readBalances(); readFeatures(); refreshOrders(); readMode(); });
+  P.onProvider(() => P.onEvent('modeChanged', () => readMode()));
   window.addEventListener('popstate', () => { const p = linkedPair(); if (p) setPair(p); });
 
   const linked = linkedPair();
   if (linked) setPair(linked);
-  readFeatures();
+  readFeatures(); readMode();
   const timers = [setInterval(refreshBook, BOOK_POLL_MS), setInterval(refreshData, DATA_POLL_MS), setInterval(refreshOrders, ORDERS_POLL_MS)];
   window.addEventListener('pagehide', () => timers.forEach(clearInterval));
 }

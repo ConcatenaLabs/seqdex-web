@@ -88,6 +88,13 @@ default-mode contract (`sequentia-web-wallet/docs/DEFAULT_MODE.md`, "SeqDEX").
 
 ## The developer view's surfaces
 
+On a pair's page the developer view adds the routes by name: above the book, "Settles
+in one step" (the default view's merged book) and one chip per route of it (on-chain
+covenant, resting leaf, pools; Lightning against BTC), each showing that route's own
+book alone, with its count of orders; and a Route column on recent trades (the relay's
+`rail` of each). The rooms below keep the routes the one-step book leaves out, each with
+its own book, never merged.
+
 ### 1. LNDEX (accent: violet)
 Pure Lightning swaps only. No submarine or mixed rails: **both legs of every
 trade travel over Lightning channels, and both maker and taker need live
