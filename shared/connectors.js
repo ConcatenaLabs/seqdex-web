@@ -46,6 +46,14 @@ export const APPROVAL_MS = 10 * 60 * 1000;   // the wallet prices first, then it
 const SILENT = new Set(['getCapabilities', 'getWalletMode', 'getAccounts', 'getBalances', 'getOrders', 'getNetwork']);
 const rid = () => Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2);
 
+// The site as a wallet page knows it: its origin and the folder it is served from (/dex/), the
+// same for every view, so one approval in the wallet covers the markets, a pair and the
+// portfolio, in this tab and the next, and the orders placed from one are listed on all.
+export function siteKey(loc = globalThis.location) {
+  if (!loc) return '';
+  return loc.origin + loc.pathname.replace(/[^/]*$/, '');
+}
+
 // ---- the groups of methods a page asks about ----
 // Each group is offered when the wallet serves every method listed for it.
 export const RAILS = {
@@ -172,6 +180,8 @@ export function localConnector({ url = LOCAL_DEFAULT_URL, fetchFn = globalThis.f
       poll();
       return true;
     },
+    // Drops this browser's session: the daemon asks its owner again at the next connect.
+    forget() { session = null; store.del(KEY); },
   };
 }
 
@@ -218,7 +228,7 @@ export function webWalletConnector({ win = globalThis.window, url = '/wallet/', 
     return new Promise((resolve, reject) => {
       const t = setTimeout(() => { waiting.delete(id); const e = new Error('the web wallet did not answer'); e.code = 'timeout'; reject(e); }, ms);
       waiting.set(id, { resolve, reject, t });
-      channel().postMessage({ type: 'request', id, from: page, wallet, page: globalThis.location ? location.origin + location.pathname : '', method, params });
+      channel().postMessage({ type: 'request', id, from: page, wallet, page: siteKey(), method, params });
     });
   }
   return {

@@ -51,6 +51,11 @@ contract (surfaces, books, settlement phases, provider dependencies).
   (`shared/vendor/lightweight-charts`, never edited; a new version replaces the file and
   its README's version and hash). A page that shows a chart shows `CHART_NOTICE`
   with its link, and the attribution logo stays on.
+- **One page for the default view.** Markets, a pair and the portfolio are views of
+  `js/shell.js`; move between them with links the shell follows (or `go`, `js/nav.js`),
+  never a page load, and start a view's timers and subscriptions in its lifecycle
+  (`js/life.js`). Wallet state the views share comes from `js/store.js`; ask it to
+  `refresh()` after changing anything.
 - Static ES modules, no bundler. Surface accents are informational
   (violet LN, gold chain, teal confidential, lime leaves); the default view
   settles every way at once and wears a neutral blue. Keep them consistent.

@@ -7,7 +7,7 @@
 import { $, el, developerView } from '../shared/app.js';
 import { assetMeta, assetByTicker, usdFor, priceUsd } from '../shared/meta.js';
 import { MOUNTS } from '../shared/book.js';
-import { orient, mergeBook, invertBook, remaindersOf, priceAtoms, amountAtoms, estimate, spendableOf } from '../shared/market-book.js';
+import { orient, mergeBook, invertBook, remaindersOf, priceAtoms, amountAtoms, estimate } from '../shared/market-book.js';
 import * as P from '../shared/provider.js';
 import * as LW from '../shared/vendor/lightweight-charts/lightweight-charts.standalone.production.mjs';
 import { createPriceChart, createDepthChart, RANGES, rangeOf } from '../shared/chart.js';
@@ -15,8 +15,8 @@ import { INDICATORS } from '../shared/indicators.js';
 import { volumeOf } from '../shared/tickers.js';
 import { mountTickers, fmtPrice, fmtUsd, tk, pairParam } from './tickers-panel.js';
 import { drawOrders, units } from './orders-view.js';
+import { state, subscribe, refresh } from './store.js';
 
-export { spendableOf };
 // Developer detail's names for the routes an order or a trade takes (the relay's rails).
 const RAIL_NAMES = {
   'onchain-fill': 'on-chain covenant', 'covenant-round': 'covenant in a round', 'clearing-round': 'clearing round',
@@ -27,7 +27,6 @@ const RAIL_NAMES = {
 const routeOf = (o) => (o.resting_leaf ? 'leaf' : o.pool ? 'pool' : o.covenant ? 'covenant' : o.lightning ? 'ln' : 'other');
 const BOOK_POLL_MS = 10_000;
 const DATA_POLL_MS = 10_000;
-const ORDERS_POLL_MS = 10_000;
 const DEPTH_ROWS = 12;
 const IND_KEY = 'seqdex.indicators', RANGE_KEY = 'seqdex.range', TYPE_KEY = 'seqdex.chartType';
 const prec = (h) => (h === 'BTC' ? 8 : (assetMeta(h).precision ?? 8));
@@ -63,7 +62,79 @@ function linkedPair() {
   return a && b && a !== b ? { base: a, quote: b } : null;
 }
 
-export async function runMarketPage() {
+const HTML = `
+  <div class="t-term">
+    <aside class="t-left" id="left">
+      <div class="t-card t-sum" id="sum">
+        <span class="t-av" id="sumAv"></span>
+        <div class="t-pair"><button type="button" id="pairName" title="Markets" style="border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer"></button><button type="button" class="t-flip" id="flip" title="Show the price the other way round">⇄</button></div>
+        <div><span class="t-last" id="lastPrice">-</span> <span class="num" id="lastChange"></span></div>
+        <div class="faint num" id="dayLine" style="font-size:11.5px"></div>
+      </div>
+      <div class="t-card t-tickers">
+        <div class="t-head"><h2>Tickers</h2></div>
+        <div id="tickers"></div>
+      </div>
+    </aside>
+
+    <section class="t-card t-chart">
+      <div class="t-head">
+        <div class="t-tabs" id="viewTabs"><button type="button" data-v="price" aria-pressed="true">Price</button><button type="button" data-v="depth" aria-pressed="false">Depth</button></div>
+        <div class="t-tabs sm" id="rangeTabs"></div>
+        <span class="t-sp"></span>
+        <div class="t-tabs sm" id="typeTabs"><button type="button" data-t="candles" aria-pressed="true">Candles</button><button type="button" data-t="line" aria-pressed="false">Line</button></div>
+        <button type="button" class="t-btn" id="indBtn" title="Indicators" aria-expanded="false">ƒx ▾</button>
+      </div>
+      <div class="t-chartbox">
+        <div class="t-legend" id="legend"></div>
+        <div class="t-cv" id="priceChart"></div>
+        <div class="t-cv" id="depthChart" style="visibility:hidden"></div>
+        <div class="t-note" id="chartNote"></div>
+        <div class="t-card t-indmenu" id="indMenu" hidden></div>
+      </div>
+    </section>
+
+    <section class="t-card t-book">
+      <div class="t-head">
+        <div class="t-tabs" id="bookTabs"><button type="button" data-b="book" aria-pressed="true">Order book</button><button type="button" data-b="trades" aria-pressed="false">Recent trades</button></div>
+        <span class="t-sp"></span>
+        <select id="groupStep" title="Group prices" style="width:auto;margin:0;height:26px;padding:0 6px;font-size:12px"></select>
+      </div>
+      <div class="t-routes" id="routeChips" hidden></div>
+      <div id="bookPane">
+        <div class="hd"><span id="hPrice">Price</span><span id="hAmount">Amount</span><span>Total USD</span></div>
+        <div id="asks"></div>
+        <div class="t-spread" id="spread"></div>
+        <div id="bids"></div>
+        <div class="t-deprat"><div class="b" id="depB"></div><div class="s" id="depS"></div></div>
+        <div class="t-deplbl"><span id="depBl"></span><span id="depSl"></span></div>
+      </div>
+      <div id="tradesPane" class="t-trades" hidden>
+        <div class="hd"><span id="htPrice">Price</span><span id="htAmount">Amount</span><span id="htRoute" hidden>Route</span><span>Time</span></div>
+        <div id="trades"></div>
+      </div>
+    </section>
+
+    <section class="t-card t-ticket-card" id="ticketCard">
+      <div class="t-ticket" id="orderForm"></div>
+    </section>
+  </div>
+
+  <div class="t-card t-bottom">
+    <div class="t-head">
+      <div class="t-tabs" id="ordTabs"><button type="button" data-o="open" aria-pressed="true">Open orders</button><button type="button" data-o="trades" aria-pressed="false">Trades</button><button type="button" data-o="history" aria-pressed="false">Order history</button></div>
+      <span class="t-sp"></span>
+      <label class="t-opt" style="font-size:12px;color:var(--dim)"><input type="checkbox" id="thisMarket"> This market only</label>
+    </div>
+    <p id="ordersNote" class="t-empty" hidden></p>
+    <div class="t-scroll" id="ordersBox"></div>
+  </div>
+
+  <div class="t-sheet-shade" id="shade"></div>
+  <div class="t-phone-bar"><button type="button" class="t-go buy" id="phBuy">Buy</button><button type="button" class="t-go sell" id="phSell">Sell</button></div>`;
+
+export function mountPair(root, life) {
+  root.innerHTML = HTML;
   let view = null;           // { base, quote } as shown
   let canon = null;          // the market's own direction, the one orders go in
   let inv = false;           // shown the other way round from canon
@@ -140,9 +211,11 @@ export async function runMarketPage() {
     tickers.redraw();
     renderForm();
     refreshBook(); refreshData(); refreshOrders(); readBalances();
+    window.scrollTo(0, 0);
   }
   $('flip').onclick = () => setPair({ base: view.quote, quote: view.base }, { push: true });
   $('pairName').onclick = () => { $('left').classList.toggle('open'); };
+  life.add(() => { priceChart.remove(); depthChart.remove(); });
 
   const tickers = mountTickers($('tickers'), {
     compact: true,
@@ -150,6 +223,7 @@ export async function runMarketPage() {
     onPick: (r) => { $('left').classList.remove('open'); setPair({ base: r.base, quote: r.quote }, { push: true }); },
     onData: (list) => { if (!view && list.length) setPair(defaultPair(list)); },
   });
+  life.add(tickers.stop);
   function defaultPair(list) {
     let best = list[0];
     for (const t of list) if (Number(t.trades_24h || 0) > Number(best.trades_24h || 0)) best = t;
@@ -168,7 +242,7 @@ export async function runMarketPage() {
       getJSON(path + `/candles?interval=${r.interval}&limit=${limit}`).catch(() => null),
       getJSON(path + '/trades?limit=60').catch(() => null),
     ]);
-    if (view !== v) return;
+    if (view !== v || !life.alive) return;
     ticker = tkr;
     const candles = ((cd && cd.candles) || []).map((c) => ({ t: c.t, o: unit(c.o), h: unit(c.h), l: unit(c.l), c: unit(c.c), v: Number(c.v) / Math.pow(10, prec(v.base)) }));
     priceChart.setCandles(candles, Math.floor(Date.now() / 1000), r);
@@ -225,7 +299,7 @@ export async function runMarketPage() {
       ]);
       offers = [...ab, ...ba]; opts.remainders = remaindersOf([...fab, ...fba]);
     }
-    if (view !== v) return;
+    if (view !== v || !life.alive) return;
     offersAll = offers; bookOpts = opts;
     drawRoutes();
     canonBook = mergeBook(route === 'one' ? offers : offers.filter((o) => routeOf(o) === route), opts);
@@ -315,9 +389,9 @@ export async function runMarketPage() {
       box.appendChild(b);
     }
   }
-  async function readMode() {
+  function readMode() {
     const was = dev;
-    dev = developerView(await P.walletMode());
+    dev = developerView(state.mode);
     if (dev !== was && view) { drawRoutes(); paintTrades(lastTrades); if (!dev) refreshBook(); }
   }
 
@@ -501,7 +575,7 @@ export async function runMarketPage() {
       st.textContent = parts.join(' ') + ' Follow it under Your orders.';
       $('fAmount').value = '';
       closeSheet();
-      refreshOrders(); refreshBook(); readBalances();
+      refresh(); refreshBook();
     } catch (e) {
       st.className = 'status err';
       const m = (e && e.message) || String(e);
@@ -516,30 +590,31 @@ export async function runMarketPage() {
   $('phSell').onclick = () => openSheet('sell');
   $('shade').onclick = closeSheet;
 
-  // ---- the wallet: balances, features, orders ----
-  async function readBalances() {
-    if (!P.account()) { balances = {}; paintBalance(); return; }
-    try { balances = spendableOf(await P.getBalances()); } catch { balances = {}; }
-    paintBalance();
-  }
-  async function readFeatures() {
-    const f = await P.features();
+  // ---- the wallet: balances, features, mode and orders, from the page's store ----
+  function readBalances() { balances = state.held; paintBalance(); }
+  function readFeatures() {
+    const f = state.features;
     const changed = [...f].sort().join() !== [...features].sort().join();
     features = f;
     if (changed && view) renderForm();
   }
-  async function refreshOrders() {
-    await drawOrders($('ordersBox'), $('ordersNote'), { tab: ordTab, market: $('thisMarket').checked ? view : null, onChange: () => { refreshOrders(); readBalances(); } });
+  function refreshOrders() {
+    if (!view) return;
+    drawOrders($('ordersBox'), $('ordersNote'), { tab: ordTab, market: $('thisMarket').checked ? view : null, onChange: refresh });
   }
   for (const b of $('ordTabs').querySelectorAll('button')) b.onclick = () => { ordTab = b.dataset.o; pressOne($('ordTabs'), b); refreshOrders(); };
   $('thisMarket').onchange = refreshOrders;
-  P.onAccountChange(() => { readBalances(); readFeatures(); refreshOrders(); readMode(); });
-  P.onProvider(() => P.onEvent('modeChanged', () => readMode()));
-  window.addEventListener('popstate', () => { const p = linkedPair(); if (p) setPair(p); });
 
   const linked = linkedPair();
   if (linked) setPair(linked);
-  readFeatures(); readMode();
-  const timers = [setInterval(refreshBook, BOOK_POLL_MS), setInterval(refreshData, DATA_POLL_MS), setInterval(refreshOrders, ORDERS_POLL_MS)];
-  window.addEventListener('pagehide', () => timers.forEach(clearInterval));
+  life.add(subscribe(() => { readBalances(); readFeatures(); refreshOrders(); readMode(); }));
+  life.every(refreshBook, BOOK_POLL_MS);
+  life.every(refreshData, DATA_POLL_MS);
+  return {
+    // The address changed within this view (back, forward, a link to another pair).
+    onUrl() {
+      const p = linkedPair();
+      if (p && (!view || p.base !== view.base || p.quote !== view.quote)) setPair(p);
+    },
+  };
 }

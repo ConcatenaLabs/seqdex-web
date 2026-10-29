@@ -1,4 +1,4 @@
-// The portfolio: one total in the reference currency across every asset, then each asset's
+// The Portfolio view: one total in the reference currency across every asset, then each asset's
 // one figure wherever the wallet holds it (BTC first, then by value; the Sequence token is
 // one row among equals), what is still arriving, your open orders, trades and order
 // history, and the trades as a CSV file.
@@ -8,20 +8,47 @@ import * as P from '../shared/provider.js';
 import { spendableOf, orient } from '../shared/market-book.js';
 import { fmtPrice, fmtUsd, tk, pairParam } from './tickers-panel.js';
 import { drawOrders, units } from './orders-view.js';
+import { state, subscribe, refresh } from './store.js';
 
 const COLORS = ['#f7931a', '#8fb8ff', '#e8b84a', '#4ade80', '#a78bfa', '#2dd4bf', '#f472b6', '#cbd5e1', '#fbbf24', '#60a5fa'];
 const pressOne = (box, btn) => { for (const b of box.querySelectorAll('button')) b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'); };
 
-export function runPortfolioPage() {
-  let tab = 'open', last = null;
+const HTML = `
+  <div class="t-pf-top">
+    <div class="t-card t-total">
+      <span class="t-k">Total</span>
+      <div class="v" id="pfTotal">-</div>
+      <div class="t-alloc" id="pfAlloc"></div>
+      <div class="t-alleg" id="pfLegend"></div>
+    </div>
+    <div class="t-card" style="padding:14px 16px">
+      <span class="t-k">Assets</span>
+      <p class="t-small" id="pfNote" style="margin-top:6px">Each asset's one figure, wherever your wallet holds it, valued in US dollars. What has arrived and cannot be spent yet shows under its figure.</p>
+    </div>
+  </div>
+  <div class="t-card"><div class="t-scroll"><table class="t-ord" id="pfAssets"><thead><tr><th>Asset</th><th class="r">Amount</th><th class="r wide">Price</th><th class="r">Value</th><th class="r wide">Share</th><th></th></tr></thead><tbody></tbody></table></div></div>
+  <div class="t-card t-bottom">
+    <div class="t-head">
+      <div class="t-tabs" id="ordTabs"><button type="button" data-o="open" aria-pressed="true">Open orders</button><button type="button" data-o="trades" aria-pressed="false">Trades</button><button type="button" data-o="history" aria-pressed="false">Order history</button></div>
+      <span class="t-sp"></span>
+      <button type="button" class="t-btn" id="exportCsv">Export CSV</button>
+    </div>
+    <p id="ordersNote" class="t-empty" hidden></p>
+    <div class="t-scroll" id="ordersBox"></div>
+  </div>`;
 
-  async function drawAssets() {
+export function mountPortfolio(root, life) {
+  root.innerHTML = HTML;
+  document.title = 'SeqDEX · Portfolio';
+  let tab = 'open';
+
+  function drawAssets() {
     const body = $('pfAssets').querySelector('tbody'); body.textContent = '';
     $('pfAlloc').textContent = ''; $('pfLegend').textContent = '';
     if (!P.account()) { $('pfTotal').textContent = '-'; $('pfNote').textContent = P.hasWallet() ? 'Connect the wallet to see what it holds.' : P.NO_WALLET; return; }
-    let b;
-    try { b = await P.getBalances(); } catch (e) { $('pfNote').textContent = 'The wallet is locked or unreachable: ' + e.message; return; }
-    const held = spendableOf(b), arriving = (b && b.arriving) || {};
+    if (state.balancesError) { $('pfNote').textContent = state.balancesError; return; }
+    $('pfNote').textContent = 'Each asset\'s one figure, wherever your wallet holds it, valued in US dollars. What has arrived and cannot be spent yet shows under its figure.';
+    const held = state.held, arriving = state.arriving;
     const rows = Object.entries(held)
       .filter(([h, v]) => h === 'BTC' || BigInt(v || 0) > 0n || BigInt(arriving[h] || 0) > 0n)
       .map(([h, v]) => ({ h, atoms: v, value: usdFor(h, v) }));
@@ -58,14 +85,13 @@ export function runPortfolioPage() {
       }
     });
   }
-  async function drawTab() { last = await drawOrders($('ordersBox'), $('ordersNote'), { tab, market: null, onChange: refresh }); }
-  function refresh() { drawAssets(); drawTab(); }
+  const drawTab = () => drawOrders($('ordersBox'), $('ordersNote'), { tab, market: null, onChange: refresh });
   for (const b of $('ordTabs').querySelectorAll('button')) b.onclick = () => { tab = b.dataset.o; pressOne($('ordTabs'), b); drawTab(); };
 
   // The trades as CSV: one line per fill, amounts in each asset's own units.
   $('exportCsv').onclick = () => {
     const rows = [['time', 'market', 'side', 'base', 'base_amount', 'quote', 'quote_amount', 'status']];
-    for (const t of (last && last.trades) || []) {
+    for (const t of (state.orders && state.orders.trades) || []) {
       const fills = t.fills && t.fills.length ? t.fills : [{ base: t.base || '0', quote: t.quote || '0', state: t.state }];
       for (const f of fills) rows.push([new Date(t.at).toISOString(), tk(t.market.base) + '/' + tk(t.market.quote), t.side, tk(t.market.base), units(f.base, t.market.base).replace(/,/g, ''), tk(t.market.quote), units(f.quote, t.market.quote).replace(/,/g, ''), f.state || t.state]);
     }
@@ -74,8 +100,6 @@ export function runPortfolioPage() {
     document.body.appendChild(a); a.click(); a.remove();
   };
 
-  P.onAccountChange(refresh);
-  refresh();
-  const timer = setInterval(refresh, 15_000);
-  window.addEventListener('pagehide', () => clearInterval(timer));
+  life.add(subscribe(() => { drawAssets(); drawTab(); }));
+  return {};
 }

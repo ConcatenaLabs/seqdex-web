@@ -256,6 +256,22 @@ The wallet drives everything sensitive. The site builds and displays;
 the wallet signs, pays, and holds keys. With no wallet there, the site runs
 read-only and says how to get one.
 
+The markets, a pair and the portfolio are one page (`js/shell.js`): `index.html`,
+`market.html` and `portfolio.html` serve the same shell, and each is a view of it. A link
+to one of them, a row of the Tickers panel, and back and forward change the address with
+the History API and swap the view; no page loads, so the header and the wallet's
+connection stay put. A view starts its timers and subscriptions in a lifecycle
+(`js/life.js`) that ends them when it leaves the screen. What the wallet holds, its
+orders, its features and its mode are read once for every view (`js/store.js`, one poll),
+so an order placed on a pair is in the portfolio at once.
+
+The wallet is connected once. The choice is kept in the browser and the wallet is asked
+silently again on the next load and in every new tab (`getAccounts`; Ambra browser,
+Sequentia Core on this computer and a paired phone keep their session, the web wallet its
+approval while its page is open); Disconnect in the wallet menu forgets it in every tab,
+and no wallet is asked again until one is connected. The web wallet knows the site by
+its folder (`siteKey`, `/dex/`), so one approval covers every view.
+
 ## Wallets
 
 `shared/connectors.js` holds the connectors and `shared/provider.js` is the one

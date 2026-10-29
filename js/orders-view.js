@@ -5,6 +5,7 @@
 import { el } from '../shared/app.js';
 import { assetMeta, fmtAtoms, usdFor } from '../shared/meta.js';
 import * as P from '../shared/provider.js';
+import { state } from './store.js';
 import { fmtPrice, fmtUsd } from './tickers-panel.js';
 
 const tk = (h) => (h === 'BTC' ? 'BTC' : assetMeta(h).ticker);
@@ -17,19 +18,16 @@ export function units(atoms, h) {
 const when = (ms) => new Date(ms).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const STATE_WORDS = { settled: 'Settled', sent: 'Sent', failed: 'Did not settle', returned: 'Returned' };
 
-// Reads the wallet's orders and draws the chosen tab into box. opts: { tab: 'open' |
-// 'trades' | 'history', market: { base, quote } | null (only that market, either way
-// round), onChange() after an order is taken back }. Returns the wallet's answer.
-export async function drawOrders(box, note, opts) {
+// Draws the chosen tab of the wallet's orders (the page's store) into box. opts: { tab:
+// 'open' | 'trades' | 'history', market: { base, quote } | null (only that market, either
+// way round), onChange() after an order is taken back }. Returns the wallet's answer.
+export function drawOrders(box, note, opts) {
   box.textContent = '';
   note.hidden = true;
   const say = (t) => { note.hidden = false; note.textContent = t; };
   if (!P.account()) { say(P.hasWallet() ? 'Connect the wallet to see your orders.' : P.NO_WALLET); return null; }
-  let r;
-  try {
-    if (!(await P.supports('getOrders'))) { say('Update the wallet to see your orders here.'); return null; }
-    r = await P.request('getOrders');
-  } catch (e) { say('Your orders are unreadable right now: ' + e.message); return null; }
+  const r = state.orders;
+  if (!r) { say(state.ordersError ? 'Your orders are unreadable right now: ' + state.ordersError : 'Reading your orders…'); return null; }
   const m = opts.market;
   const inMarket = (x) => !m || (x.market.base === m.base && x.market.quote === m.quote) || (x.market.base === m.quote && x.market.quote === m.base);
   const name = (mk) => tk(mk.base) + ' / ' + tk(mk.quote);
@@ -81,6 +79,8 @@ export async function drawOrders(box, note, opts) {
     for (const t of r.trades.filter(inMarket)) {
       const fills = t.fills && t.fills.length ? t.fills : [{ base: t.base || '0', quote: t.quote || '0', state: t.state }];
       for (const f of fills) {
+        // The wallet's record of placing an order moved nothing yet: not a trade.
+        if (!(BigInt(f.base || 0) > 0n) && !(BigInt(f.quote || 0) > 0n)) continue;
         const buy = t.side === 'buy';
         rows.push({ at: t.at, pay: buy ? [f.quote, t.market.quote] : [f.base, t.market.base], get: buy ? [f.base, t.market.base] : [f.quote, t.market.quote], state: f.state || t.state, v: usdFor(t.market.quote, f.quote) });
       }

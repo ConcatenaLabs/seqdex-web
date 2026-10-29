@@ -74,10 +74,9 @@ export async function initChrome(active) {
 
   const nav = el('nav', 'nav');
   nav.id = 'devNav';
-  for (const [href, label, s, also] of MAIN) {
+  for (const [href, label, s] of MAIN) {
     const a = el('a', null, label);
-    a.href = href; a.dataset.s = s;
-    if (href === here || href === active || also.includes(here)) a.classList.add('on');
+    a.href = href; a.dataset.s = s; a.dataset.main = href;
     nav.appendChild(a);
   }
   const links = [];
@@ -98,6 +97,7 @@ export async function initChrome(active) {
   poolLink.href = 'pools.html'; poolLink.dataset.s = 'chain'; poolLink.id = 'navPools';
   if (here === 'pools.html' || active === 'pools.html') poolLink.classList.add('on');
   bar.appendChild(nav);
+  markNav(active || here);
   bar.appendChild(el('span', 'spacer'));
   // The developer view's links are drawn only in the developer view; the default view
   // has no navigation beyond the wordmark, which leads to the markets.
@@ -164,6 +164,14 @@ export async function initChrome(active) {
       }
       menu.appendChild(row);
     }
+    // Connected: Disconnect forgets the wallet here and in every other tab.
+    if (P.account()) {
+      const d = el('button', 'connect-opt'); d.type = 'button'; d.id = 'btnDisconnect';
+      d.appendChild(el('b', null, 'Disconnect'));
+      d.appendChild(el('span', 'faint', P.activeConnector().label));
+      d.onclick = () => { menu.hidden = true; P.disconnect(); };
+      menu.appendChild(d);
+    }
   };
 
   P.onAccountChange((acc) => renderConnect(btn, acc, P.hasWallet()));
@@ -227,6 +235,14 @@ export async function initChrome(active) {
   // paint; a late provider's restore reaches the pages through onAccountChange.
   await Promise.allSettled([loadMeta(), restored]);
   return P.account();
+}
+
+// Marks the main navigation's link for a page (a pair's page counts as Markets).
+export function markNav(page) {
+  for (const a of document.querySelectorAll('#devNav a[data-main]')) {
+    const m = MAIN.find((x) => x[0] === a.dataset.main);
+    a.classList.toggle('on', !!m && (m[0] === page || m[3].includes(page)));
+  }
 }
 
 // Pairing a wallet on a phone: a QR code to scan, and the same as a link for a wallet app on
