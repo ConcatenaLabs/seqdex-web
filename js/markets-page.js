@@ -2,7 +2,7 @@
 import { $ } from '../shared/app.js';
 import { assetMeta, priceUsd } from '../shared/meta.js';
 import * as P from '../shared/provider.js';
-import { mountTickers, fmtUsd } from './tickers-panel.js';
+import { mountTickers, fmtUsd, tk } from './tickers-panel.js';
 import { rowsOfTicker } from '../shared/tickers.js';
 import { spendableOf } from '../shared/market-book.js';
 
@@ -12,7 +12,7 @@ export function runMarketsPage() {
     held: () => held,
     onData(tickers) {
       let vol = 0, trades = 0;
-      for (const t of tickers) { const [r] = rowsOfTicker(t, assetMeta, priceUsd); vol += r.volume || 0; trades += t.trades_24h || 0; }
+      for (const t of tickers) { const [r] = rowsOfTicker(t, assetMeta, priceUsd, tk); vol += r.volume || 0; trades += t.trades_24h || 0; }
       $('stMarkets').textContent = String(tickers.length);
       $('stVolume').textContent = '$' + fmtUsd(vol, 2);
       $('stTrades').textContent = trades.toLocaleString('en-US');

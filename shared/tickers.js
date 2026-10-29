@@ -7,20 +7,35 @@
 // Prices are whole quote units per whole base unit; volume is the market's last 24 hours
 // in the reference currency, the same for both rows of a market.
 
+import { quoteRank } from './market-book.js';
+
 export const ANY = 'ANY';
+
+// A market's last 24 hours of volume in the reference currency, valued in the asset that is
+// the pair's unit of account (the quote by the wallets' rule, `quoteRank`: BTC, then the
+// fiat stablecoins), else in the other one; null when neither is priced. Read either way
+// round, a market gives one figure.
+export function volumeOf(t, meta, refPrice, tickerOf = (h) => h) {
+  const prec = (h) => (h === 'BTC' ? 8 : (meta(h).precision ?? 8));
+  const sides = [[t.quote, t.quote_volume_24h], [t.base, t.volume_24h]];
+  if (quoteRank(t.base, tickerOf) > quoteRank(t.quote, tickerOf)) sides.reverse();
+  for (const [h, v] of sides) {
+    const p = refPrice(h);
+    if (v != null && p > 0) return Number(v) / 10 ** prec(h) * p;
+  }
+  return t.trades_24h ? null : 0;
+}
 
 // One market of /v1/tickers as its two rows. meta(h) -> { precision }; refPrice(h) -> the
 // reference currency per whole unit, or null.
-export function rowsOfTicker(t, meta, refPrice) {
+export function rowsOfTicker(t, meta, refPrice, tickerOf = (h) => h) {
   const b = t.base, q = t.quote;
   const bp = b === 'BTC' ? 8 : (meta(b).precision ?? 8), qp = q === 'BTC' ? 8 : (meta(q).precision ?? 8);
   const unit = (p) => (p > 0 ? p * 10 ** (bp - qp) : null);
   const last = unit(Number(t.last));
   const hi = unit(Number(t.high_24h)), lo = unit(Number(t.low_24h));
   const ch = t.change_pct_24h != null ? Number(t.change_pct_24h) : null;
-  const pb = refPrice(b), pq = refPrice(q);
-  const vol = t.quote_volume_24h != null && pq > 0 ? Number(t.quote_volume_24h) / 10 ** qp * pq
-    : t.volume_24h != null && pb > 0 ? Number(t.volume_24h) / 10 ** bp * pb : (t.trades_24h ? null : 0);
+  const vol = volumeOf(t, meta, refPrice, tickerOf);
   const spark = Array.isArray(t.spark_7d) ? t.spark_7d.map((p) => unit(Number(p)) || 0) : [];
   const inv = (x) => (x > 0 ? 1 / x : null);
   const market = b + '/' + q;
@@ -38,7 +53,7 @@ export function tickerGroups(tickers, { anchor = ANY, search = '', meta, refPric
   const q = String(search || '').trim().toLowerCase();
   const hit = (h) => String(tickerOf(h) || '').toLowerCase().includes(q);
   const rows = [];
-  for (const t of tickers || []) for (const r of rowsOfTicker(t, meta, refPrice)) rows.push(r);
+  for (const t of tickers || []) for (const r of rowsOfTicker(t, meta, refPrice, tickerOf)) rows.push(r);
   const groups = new Map();
   for (const r of rows) {
     const g = groups.get(r.base) || { base: r.base, volume: 0, rows: [] };

@@ -62,3 +62,15 @@ test('a market with no trade has no change and no volume to show', () => {
 test('the anchors: Any, then every asset in a market, BTC first', () => {
   assert.deepEqual(anchorsOf([gu, su, gb], tickerOf).map((h) => (h === ANY ? ANY : tickerOf(h))), [ANY, 'BTC', 'GOLD', 'tSEQ', 'USDX']);
 });
+
+test('a market has one volume, valued in its unit of account, whichever way round it is read', async () => {
+  const { volumeOf } = await import('../shared/tickers.js');
+  // GOLD/USDX: 2 GOLD for 8000 USDX; GOLD's own reference price says 4100.
+  const t = { base: G, quote: U, volume_24h: 2e8, quote_volume_24h: 8000e8, trades_24h: 1 };
+  const flipped = { base: U, quote: G, volume_24h: 8000e8, quote_volume_24h: 2e8, trades_24h: 1 };
+  const rp = (h) => ({ [G]: 4100, [U]: 1 })[h] ?? null;
+  assert.equal(volumeOf(t, meta, rp, tickerOf), 8000);
+  assert.equal(volumeOf(flipped, meta, rp, tickerOf), 8000);
+  // Unpriced unit of account: the other side.
+  assert.equal(volumeOf(t, meta, (h) => (h === G ? 4100 : null), tickerOf), 8200);
+});

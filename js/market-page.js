@@ -12,6 +12,7 @@ import * as P from '../shared/provider.js';
 import * as LW from '../shared/vendor/lightweight-charts/lightweight-charts.standalone.production.mjs';
 import { createPriceChart, createDepthChart, RANGES, rangeOf } from '../shared/chart.js';
 import { INDICATORS } from '../shared/indicators.js';
+import { volumeOf } from '../shared/tickers.js';
 import { mountTickers, fmtPrice, fmtUsd, tk, pairParam } from './tickers-panel.js';
 import { drawOrders, units } from './orders-view.js';
 
@@ -189,7 +190,7 @@ export async function runMarketPage() {
     const parts = [];
     if (t.trades_24h) {
       parts.push('H ' + fmtPrice(unit(Number(t.high_24h))), 'L ' + fmtPrice(unit(Number(t.low_24h))));
-      const vu = usdFor(view.quote, Number(t.quote_volume_24h || 0));
+      const vu = volumeOf(t, assetMeta, priceUsd, tk);
       parts.push('Vol ' + (vu != null ? '$' + fmtUsd(vu) : fmtUsd(Number(t.quote_volume_24h || 0) / Math.pow(10, prec(view.quote)), 2) + ' ' + tk(view.quote)));
     } else parts.push(last ? 'No trades in the last 24 hours' : 'No trades yet');
     $('dayLine').textContent = parts.join(' · ');
