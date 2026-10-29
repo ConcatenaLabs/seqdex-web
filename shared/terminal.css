@@ -44,6 +44,28 @@ table.t-tkr .star[aria-pressed="true"] { color: var(--gold); }
 .t-stat { display: flex; flex-direction: column; }
 .t-stat .v { font-family: var(--mono); font-size: 15px; }
 
+/* the shared asset chooser (shared/asset-picker.js), and the button that opens it */
+.t-anchor { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--txt); font: 600 13px var(--disp); min-width: 92px; justify-content: space-between; cursor: pointer; }
+.t-anchor:hover { border-color: var(--accent); }
+.t-anchor .caret { color: var(--faint); font-size: 11px; }
+.swpop { position: fixed; z-index: 70; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 18px 50px rgba(0,0,0,.55); width: min(340px, calc(100vw - 16px)); display: flex; flex-direction: column; overflow: hidden; }
+.swpop-search { padding: 10px 10px 6px; }
+.swpop-search input { width: 100%; margin: 0; height: 34px; font-size: 14px; }
+.swpop-list { overflow: auto; padding: 2px 6px 8px; }
+.swopt { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: transparent; border: none; color: var(--txt); padding: 8px 8px; border-radius: 8px; cursor: pointer; font-family: var(--disp); }
+.swopt:hover, .swopt.kbd { background: var(--panel2); }
+.swopt[disabled] { opacity: .4; cursor: default; }
+.swopt-cur { box-shadow: inset 2px 0 0 var(--accent); background: rgba(143,184,255,.06); }
+.swopt-tk { font-weight: 700; font-size: 14px; min-width: 58px; }
+.swopt-mid { flex: 1 1 auto; min-width: 0; }
+.swopt-name { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.swopt-bal { margin-left: auto; text-align: right; white-space: nowrap; flex: 0 0 auto; max-width: 48%; overflow: hidden; }
+.swopt-bal .b { font: 12.5px var(--mono); }
+.swopt-bal .r { font-size: 11px; color: var(--dim); }
+.swopt-empty { padding: 12px; color: var(--dim); font-size: 13px; }
+.swopt-grp { padding: 8px 10px 3px; font-size: 10.5px; color: var(--faint); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+.swopt-more { padding: 6px 10px; font-size: 11.5px; color: var(--faint); }
+
 /* ---- a pair's terminal ---- */
 .t-term { display: grid; grid-template-columns: 300px minmax(0, 1fr) 286px 300px; gap: 10px; align-items: stretch; }
 .t-left { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
