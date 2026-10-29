@@ -3,11 +3,13 @@
 // price in ("Any" lists every asset with a row for each asset it trades against). The
 // Markets page shows it whole; a pair's page shows it compact beside the chart.
 import { el } from '../shared/app.js';
-import { assetMeta, priceUsd } from '../shared/meta.js';
+import { assetMeta, priceUsd, fmtAtoms } from '../shared/meta.js';
 import { MOUNTS } from '../shared/book.js';
 import { ANY, tickerGroups, anchorsOf, TICKER_WORDS as W } from '../shared/tickers.js';
 import { sparkSvg } from '../shared/chart.js';
 import { go } from './nav.js';
+import { openPicker, PICKER_WORDS } from '../shared/asset-picker.js';
+import { state as wallet } from './store.js';
 
 const POLL_MS = 15_000;
 const FAV_KEY = 'seqdex.favourites';
@@ -45,7 +47,11 @@ export function mountTickers(host, opts = {}) {
   const ctl = el('div', 't-ctl');
   const q = el('input'); q.type = 'search'; q.placeholder = W.search; q.setAttribute('aria-label', W.search); q.autocomplete = 'off';
   const lab = el('label', 't-k', W.anchor); lab.htmlFor = 'tkAnchor' + (compact ? 'S' : '');
-  const sel = el('select'); sel.id = lab.htmlFor;
+  // "Priced in": the shared asset chooser, Any pinned on top, then your assets with their
+  // balances, then every asset that prices a market.
+  const sel = el('button', 't-anchor'); sel.type = 'button'; sel.id = lab.htmlFor;
+  sel.setAttribute('aria-haspopup', 'listbox'); sel.setAttribute('aria-expanded', 'false');
+  const selName = el('span', null, W.any); sel.appendChild(selName); sel.appendChild(el('span', 'caret', '▾'));
   ctl.appendChild(q);
   if (!compact) ctl.appendChild(lab);
   else sel.title = W.anchor;
@@ -76,15 +82,23 @@ export function mountTickers(host, opts = {}) {
 
   const pick = opts.onPick || ((r) => go('market.html?pair=' + encodeURIComponent(pairParam(r.base, r.quote))));
   q.addEventListener('input', () => { search = q.value; draw(); });
-  sel.addEventListener('change', () => { anchor = sel.value; draw(); });
+  sel.addEventListener('click', () => {
+    const prec = (h) => (h === 'BTC' ? 8 : (assetMeta(h).precision ?? 8));
+    const items = anchorsOf(tickers, tk).map((h) => {
+      if (h === ANY) return { hex: ANY, ticker: W.any, name: 'Every market', pin: true, cur: anchor === ANY };
+      let atoms = 0n; try { atoms = BigInt(wallet.held[h] || 0); } catch {}
+      const v = priceUsd(h) > 0 && atoms > 0n ? '$' + fmtUsd(Number(atoms) / 10 ** prec(h) * priceUsd(h), 2) : '';
+      return { hex: h, ticker: tk(h), name: h === 'BTC' ? 'Bitcoin' : (assetMeta(h).name || ''), held: atoms > 0n, tradable: true, cur: anchor === h,
+        bal: atoms > 0n ? { b: fmtAtoms(atoms, prec(h)), r: v } : null };
+    });
+    openPicker(sel, items, (h) => { setAnchor(h); draw(); }, { hint: PICKER_WORDS.hintSearch });
+  });
+  function setAnchor(h) { anchor = h; sel.dataset.value = h; selName.textContent = h === ANY ? W.any : tk(h); }
+  setAnchor(ANY);
 
+  // The asset prices are in stays chosen while it prices some market.
   function fillAnchors() {
-    const list = anchorsOf(tickers, tk);
-    const was = sel.value || anchor;
-    sel.textContent = '';
-    for (const h of list) { const o = el('option', null, h === ANY ? W.any : tk(h)); o.value = h; sel.appendChild(o); }
-    sel.value = list.includes(was) ? was : ANY;
-    anchor = sel.value;
+    if (!anchorsOf(tickers, tk).includes(anchor)) setAnchor(ANY);
   }
   function draw() {
     let groups = tickerGroups(tickers, { anchor, search, meta: assetMeta, refPrice, tickerOf: tk });

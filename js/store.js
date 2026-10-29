@@ -9,6 +9,7 @@ const POLL_MS = 10_000;
 export const state = {
   account: null,       // the connected account, or null
   held: {},            // asset id or 'BTC' -> atoms (the wallet's one figure)
+  spendable: null,     // asset id or 'BTC' -> atoms a trade can pay from now, when the wallet says
   arriving: {},        // asset id or 'BTC' -> atoms received and not yet spendable
   balancesError: null,
   orders: null,        // getOrders' answer, or null
@@ -26,7 +27,7 @@ function emit() { for (const fn of [...subs]) { try { fn(state); } catch (e) { c
 async function read() {
   state.account = P.account();
   if (!state.account) {
-    Object.assign(state, { held: {}, arriving: {}, balancesError: null, orders: null, ordersError: null, features: new Set(), mode: null, at: Date.now() });
+    Object.assign(state, { held: {}, spendable: null, arriving: {}, balancesError: null, orders: null, ordersError: null, features: new Set(), mode: null, at: Date.now() });
     return;
   }
   const [b, o, f, m] = await Promise.all([
@@ -35,7 +36,10 @@ async function read() {
     P.features(),
     P.walletMode(),
   ]);
-  if (b.v) { state.held = spendableOf(b.v); state.arriving = b.v.arriving || {}; state.balancesError = null; }
+  if (b.v) {
+    state.held = spendableOf(b.v); state.arriving = b.v.arriving || {}; state.balancesError = null;
+    state.spendable = b.v.spendable && typeof b.v.spendable === 'object' ? { ...b.v.spendable } : null;
+  }
   else state.balancesError = 'The wallet is locked or unreachable: ' + (b.e && b.e.message);
   if (o.v) { state.orders = o.v; state.ordersError = null; }
   else state.ordersError = (o.e && o.e.message) || 'unreadable';

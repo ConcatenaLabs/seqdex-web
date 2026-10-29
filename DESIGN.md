@@ -25,7 +25,9 @@ default-mode contract (`sequentia-web-wallet/docs/DEFAULT_MODE.md`, "SeqDEX").
   (`js/tickers-panel.js` on `shared/tickers.js`), from the relay's one answer for every
   market (`/seqob/v1/tickers`). Every market is two rows, its base priced in its quote
   and the other way round, each figure turned round with it (last, high, low, 24-hour
-  change); volume is in the reference currency, the same for both rows. "Priced in Any"
+  change); volume is in the reference currency, the same for both rows. "Priced in" is the
+  shared asset chooser (`shared/asset-picker.js`, copied from the web wallet: a search box,
+  your assets first with their balances, Any pinned on top). "Priced in Any"
   lists every asset once, BTC first and then by volume, with a row for each asset it
   trades against; choosing an asset prices every market in it. A search matches either
   side; favourites are kept in the browser; "You hold" keeps the assets the wallet
@@ -57,7 +59,7 @@ default-mode contract (`sequentia-web-wallet/docs/DEFAULT_MODE.md`, "SeqDEX").
   holds from the relay's fill records (the order rests again at the fill's output
   2k+1). Levels are grouped by price, with their running depth.
 - **Prices and the chart.** A price is the last trade, in the quote's own units; the
-  book's spread line gives the spread and the middle of the book; a book whose best bid
+  book's spread line reads "Spread <amount> · <percent> · Mid <price>"; a book whose best bid
   is above its best ask is shown as it is. Totals are in the reference currency. The
   ticker, the candles and the trades come from the relay in the pair's direction
   (`/seqob/v1/market/{base}/{quote}/ticker|candles|trades`; that relay follows the

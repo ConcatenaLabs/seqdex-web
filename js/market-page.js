@@ -356,7 +356,7 @@ export function mountPair(root, life) {
     sp.appendChild(el('span', 'l', last ? fmtPrice(last) : '-'));
     const a = book.best.ask, b = book.best.bid;
     sp.appendChild(el('span', 's', a != null && b != null
-      ? 'Spread ' + ((a - b) / ((a + b) / 2) * 100).toFixed(2) + '% · Mid ' + fmtPrice((a + b) / 2)
+      ? 'Spread ' + (a < b ? '-' : '') + fmtPrice(Math.abs(a - b)) + ' · ' + ((a - b) / ((a + b) / 2) * 100).toFixed(2) + '% · Mid ' + fmtPrice((a + b) / 2)
       : a == null && b == null ? 'Nobody is buying or selling right now' : a == null ? 'Only buyers right now' : 'Only sellers right now'));
     const bt = Number(bd.at(-1) || 0n), at = Number(ad.at(-1) || 0n), tot = bt + at;
     const bp = tot > 0 ? Math.round(bt / tot * 100) : 50;
@@ -484,9 +484,11 @@ export function mountPair(root, life) {
     }
     box.appendChild(d);
   }
-  // What the ticket can spend, in the ticket's amount asset.
+  // What the ticket can spend, in the ticket's amount asset: what the wallet's trades can pay
+  // from now (getBalances' `spendable`) where it says, else what it holds.
   function maxAmount() {
-    const has = (h) => Number(balances[h] || 0) / Math.pow(10, prec(h));
+    const pool = state.spendable || balances;
+    const has = (h) => Number(pool[h] || 0) / Math.pow(10, prec(h));
     const px = Number($('fPrice') && $('fPrice').value) || (side === 'buy' ? book && book.best.ask : book && book.best.bid) || 0;
     if (!inv) return side === 'buy' ? (px > 0 ? has(view.quote) / px : 0) : has(view.base);
     return side === 'buy' ? has(view.quote) : has(view.base) * px;
