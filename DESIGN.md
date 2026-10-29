@@ -71,8 +71,12 @@ default-mode contract (`sequentia-web-wallet/docs/DEFAULT_MODE.md`, "SeqDEX").
   what a limit order does not fill. Order types and options beyond market and limit
   (an auction, post only, nothing left resting, the smallest fill, when an order can
   be taken back) are drawn only when the wallet lists them in `getCapabilities`'
-  `features`. The ticket's estimate is the page's own walk of the book (what fills now
-  and what rests) and says the wallet shows the exact amounts.
+  `features`. The ticket's two amounts, **You pay** and **You receive**, are tethered: the one
+  typed stays, the other follows at the limit price for a limit order and by walking the book
+  (`estimate`, `estimateQuote`) for a market order, with "The book can fill up to … now." when it
+  cannot; 25%, 50%, 75% and Max fill You pay from what the wallet can pay. For a limit, the
+  estimate says what fills now and what rests, and the ticket says the wallet shows the exact
+  amounts.
 - **Your orders** (`js/orders-view.js`, on the pair's page and the portfolio):
   `getOrders`, polled. Open orders show how much is filled, and either a button to
   take back what is left (`cancelOrder`), once its time has run out, or from when it
