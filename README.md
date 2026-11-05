@@ -54,7 +54,8 @@ Wallet protocol: [`sequentia-extension/doc/PROVIDER.md`](https://github.com/Conc
 Static ES modules, no bundler, no framework. Serve the directory as-is;
 deployed behind Caddy at `/dex/` on the testnet box.
 
-Tests: `node --test`.
+Tests: `node --test`. CI runs them on every pull request and on `master`
+(`.github/workflows/tests.yml`).
 
 Run it locally: the relays, the asset registry and the prices answer only their own
 origin (`https://sequentiatestnet.com`), so a copy served from elsewhere reads them

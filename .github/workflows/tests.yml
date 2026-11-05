@@ -1,0 +1,22 @@
+# The unit tests (test/*.test.mjs, `node --test`) on every pull request and on master. The site
+# is static and runs in the browser; Node is only the test runner, so this uses Node 22, the
+# Node the web wallet's tests run on.
+# Not run here: nothing in test/ needs a browser or the live testnet.
+name: unit tests
+on:
+  pull_request:
+  push:
+    branches: [master]
+permissions:
+  contents: read
+jobs:
+  node-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --version
+      - run: node --test
