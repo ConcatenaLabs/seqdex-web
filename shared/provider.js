@@ -6,7 +6,14 @@
 // business and stays out of this file so it can never be called from here by accident.
 import { extensionConnector, localConnector, webWalletConnector, remoteConnector, railsOf, LOCAL_DEFAULT_URL } from './connectors.js';
 
-const CHOICE_KEY = 'seqdex.connector';
+// The site this door serves: its name in a wallet's pairing, where the person's choice is kept,
+// and the connectors it offers, in the order a wallet is looked for when none was chosen. SeqDEX
+// offers all four. Another site of this origin that carries this file sets
+// `globalThis.SEQ_PROVIDER_SITE` before importing it: Emissio offers the connectors its
+// configuration names.
+const SITE = { name: 'SeqDEX', choiceKey: 'seqdex.connector', offer: ['extension', 'local', 'webwallet', 'phone'],
+  ...(globalThis.SEQ_PROVIDER_SITE || {}) };
+const CHOICE_KEY = SITE.choiceKey;
 // The daemon's address: its default port, or another on this computer's loopback
 // address that `?local=<port>` names (kept in the browser; `?local=default` clears it).
 // Nothing but a loopback address is taken, so a link cannot point the site's requests
@@ -23,8 +30,13 @@ function localUrl() {
   return LOCAL_DEFAULT_URL;
 }
 // The web wallet lives on this origin at /wallet/ (the site at /dex/).
-const CONNECTORS = { extension: extensionConnector(), local: localConnector({ url: localUrl() }),
-  webwallet: webWalletConnector({ url: '/wallet/' }), phone: remoteConnector({ name: 'SeqDEX' }) };
+const MAKE = { extension: () => extensionConnector(), local: () => localConnector({ url: localUrl() }),
+  webwallet: () => webWalletConnector({ url: '/wallet/' }), phone: () => remoteConnector({ name: SITE.name }) };
+const OFFER = SITE.offer.filter((id, i, a) => MAKE[id] && a.indexOf(id) === i);
+if (!OFFER.length) throw new Error('this site offers no wallet connector');
+const CONNECTORS = Object.fromEntries(OFFER.map((id) => [id, MAKE[id]()]));
+const offered = (id) => !!CONNECTORS[id];
+const here = (id) => offered(id) && CONNECTORS[id].present();
 
 let cachedAccount = null;
 const listeners = new Set();
@@ -45,11 +57,8 @@ let disconnected = storedDisconnect();
 let chosen = storedChoice();
 function active() {
   if (chosen) return CONNECTORS[chosen];
-  if (CONNECTORS.extension.present()) return CONNECTORS.extension;
-  if (CONNECTORS.local.present()) return CONNECTORS.local;
-  if (CONNECTORS.webwallet.present()) return CONNECTORS.webwallet;
-  if (CONNECTORS.phone.present()) return CONNECTORS.phone;
-  return CONNECTORS.extension;
+  for (const id of OFFER) if (here(id)) return CONNECTORS[id];
+  return CONNECTORS[OFFER[0]];
 }
 export function connectorById(id) { return CONNECTORS[id] || null; }
 
@@ -184,31 +193,34 @@ const presence = new Set();
 export function onPresence(fn) { presence.add(fn); }
 function emitPresence() { for (const fn of presence) { try { fn(); } catch {} } }
 async function probeLocal() {
+  if (!offered('local')) return false;
   const was = CONNECTORS.local.present();
   const ok = await CONNECTORS.local.available();
   if (ok !== was) emitPresence();
   fireReady();
   return ok;
 }
-const wantsLocal = () => chosen === 'local' || (!chosen && !CONNECTORS.extension.present());
+const wantsLocal = () => offered('local') && (chosen === 'local' || (!chosen && !here('extension')));
 // The extension's inpage script runs before the page's own, so whether it is there is
 // known at load; one that lands later is announced by its event.
 export const localReady = wantsLocal() ? probeLocal() : Promise.resolve(false);
 // The web wallet answers on the channel at once, when a wallet page is open: looked for when it
 // is the wallet chosen, or while no wallet is there at all.
 async function probeWebWallet() {
+  if (!offered('webwallet')) return false;
   const was = CONNECTORS.webwallet.present();
   const ok = await CONNECTORS.webwallet.available();
   if (ok !== was) emitPresence();
   fireReady();
   return ok;
 }
-export const webWalletReady = (chosen === 'webwallet' || (!chosen && !CONNECTORS.extension.present())) ? probeWebWallet() : Promise.resolve(false);
+const wantsWebWallet = () => offered('webwallet') && (chosen === 'webwallet' || (!chosen && !here('extension')));
+export const webWalletReady = wantsWebWallet() ? probeWebWallet() : Promise.resolve(false);
 export const probeWebWalletNow = probeWebWallet;
 export const probeLocalNow = probeLocal;
 if (typeof setInterval !== 'undefined') setInterval(() => {
   if (wantsLocal()) probeLocal();
-  if (!CONNECTORS.webwallet.present() && (chosen === 'webwallet' || (!chosen && !hasWallet()))) probeWebWallet();
+  if (offered('webwallet') && !CONNECTORS.webwallet.present() && (chosen === 'webwallet' || (!chosen && !hasWallet()))) probeWebWallet();
 }, 5000);
 
 const watched = new WeakSet();

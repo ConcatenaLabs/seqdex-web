@@ -323,6 +323,13 @@ filled from leaves, orders resting as leaves, pools), and offer only that.
   `provider`: the pairing binds it). The pairing is kept in the browser until it is
   forgotten from the chooser or the wallet sends `disconnect`.
 
+`shared/provider.js` serves the site that carries it. SeqDEX offers all four
+connectors; another site of this origin that carries the same two files (Emissio,
+which links a wallet to an account with `signMessage`) sets
+`globalThis.SEQ_PROVIDER_SITE = { name, choiceKey, offer }` before importing it,
+and is then offered, and looks for, only the connectors in `offer`, keeping the
+person's choice under its own key.
+
 The connect button opens a chooser with all four, each marked Ready, Connected,
 Not open (the web wallet), Pair or Paired (a phone), Not installed or Not
 running. The choice is kept in the browser; with none made, the extension is
