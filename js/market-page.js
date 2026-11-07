@@ -15,6 +15,7 @@ import { INDICATORS } from '../shared/indicators.js';
 import { volumeOf } from '../shared/tickers.js';
 import { mountTickers, fmtPrice, fmtUsd, tk, pairParam } from './tickers-panel.js';
 import { drawOrders, units } from './orders-view.js';
+import { placedText } from '../shared/order-words.js';
 import { state, subscribe, refresh } from './store.js';
 
 // Developer detail's names for the routes an order or a trade takes (the relay's rails).
@@ -594,12 +595,7 @@ export function mountPair(root, life) {
       st.textContent = 'Waiting for your approval in the wallet…';
       const r = await P.request('placeOrder', params);
       st.className = 'status ok';
-      const parts = [];
-      if (r.filled) parts.push('Traded with ' + r.filled + (r.filled === 1 ? ' order' : ' orders') + '.');
-      if (r.order) parts.push(r.filled ? 'Your order for the rest is on the book.' : 'Your order is on the book.');
-      if (r.order_error) parts.push('The rest was not placed: ' + r.order_error + '.');
-      if (r.failed && r.failed.length) parts.push(r.failed.length + ' order' + (r.failed.length === 1 ? ' was' : 's were') + ' taken by someone else first; nothing of yours moved for ' + (r.failed.length === 1 ? 'it' : 'them') + '.');
-      st.textContent = parts.join(' ') + ' Follow it under Your orders.';
+      st.textContent = placedText(r);
       $('fPay').value = ''; $('fReceive').value = '';
       closeSheet();
       refresh(); refreshBook();

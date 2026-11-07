@@ -1,6 +1,6 @@
 // Your orders and trades, as the pair page and the portfolio show them: open orders (how
 // much is filled, and when what is left can be taken back), trades (each a row as in the
-// wallets' history: Sent, Received once the wallet holds what it brings, then Settled) and order
+// wallets' history: Sending, Sent, Received once the wallet holds what it brings, then Settled) and order
 // history. Everything comes from the wallet (`getOrders`, `cancelOrder`); this page reads, the
 // wallet signs.
 import { el } from '../shared/app.js';
@@ -8,6 +8,7 @@ import { assetMeta, fmtAtoms, usdFor } from '../shared/meta.js';
 import * as P from '../shared/provider.js';
 import { state } from './store.js';
 import { fmtPrice, fmtUsd } from './tickers-panel.js';
+import { STATE_WORDS } from '../shared/order-words.js';
 
 const tk = (h) => (h === 'BTC' ? 'BTC' : assetMeta(h).ticker);
 const prec = (h) => (h === 'BTC' ? 8 : (assetMeta(h).precision ?? 8));
@@ -17,9 +18,6 @@ export function units(atoms, h) {
   return Number(i).toLocaleString('en-US') + (f ? '.' + f : '');
 }
 const when = (ms) => new Date(ms).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-// `received`: what the trade brings is the wallet's already (a swap the maker completed), only its
-// settling with the network is left.
-const STATE_WORDS = { settled: 'Settled', received: 'Received', sent: 'Sent', failed: 'Did not settle', returned: 'Returned' };
 
 // Draws the chosen tab of the wallet's orders (the page's store) into box. opts: { tab:
 // 'open' | 'trades' | 'history', market: { base, quote } | null (only that market, either
