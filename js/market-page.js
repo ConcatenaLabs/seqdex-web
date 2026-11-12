@@ -5,6 +5,7 @@
 // own direction, the one the makers post in (`orient`). The wallet chooses how each trade
 // settles (`placeOrder`); this page names none of the ways a trade can travel.
 import { $, el, developerView } from '../shared/app.js';
+import { statusLine } from '../shared/status-line.js';
 import { assetMeta, assetByTicker, usdFor, priceUsd } from '../shared/meta.js';
 import { MOUNTS } from '../shared/book.js';
 import { orient, mergeBook, invertBook, remaindersOf, priceAtoms, amountAtoms, minFillAtoms, estimate, estimateQuote } from '../shared/market-book.js';
@@ -141,6 +142,8 @@ export function mountPair(root, life) {
   let inv = false;           // shown the other way round from canon
   let canonBook = null, book = null, ticker = null;
   let side = 'buy', type = 'market', busy = false, features = new Set();
+  // What the ticket last said of an order, shown again on a form drawn while a trade is waited for.
+  const status = statusLine(() => $('fStatus'));
   let rangeKey = store.get(RANGE_KEY, '1W'), chartType = store.get(TYPE_KEY, 'candles');
   const shown = new Set(store.get(IND_KEY, INDICATORS.filter((i) => i.on).map((i) => i.key)));
   let groupStep = null, balances = {}, ordTab = 'open', lastCandle = null;
@@ -210,6 +213,8 @@ export function mountPair(root, life) {
     for (const id of ['hAmount', 'htAmount']) $(id).textContent = 'Amount ' + tk(view.base);
     for (const id of ['asks', 'bids', 'spread', 'trades']) $(id).textContent = '';
     tickers.redraw();
+    // Another pair: what was said of the last order is not this pair's, unless it is still waited for.
+    if (!busy) status.say('status', '');
     renderForm();
     refreshBook(); refreshData(); refreshOrders(); readBalances();
     window.scrollTo(0, 0);
@@ -458,6 +463,8 @@ export function mountPair(root, life) {
     box.appendChild(el('p', 't-small', 'Your wallet shows the exact amounts and fees before anything is signed.'));
     const st = el('div', 'status'); st.id = 'fStatus'; st.setAttribute('role', 'status'); st.setAttribute('aria-live', 'polite');
     box.appendChild(st);
+    status.paint();
+    go.disabled = busy;
     go.onclick = submit;
     paintBalance(); tether();
   }
@@ -572,9 +579,10 @@ export function mountPair(root, life) {
     line(o.side === 'buy' ? 'You pay at most' : 'You receive at least', amt(total, canon.quote));
   }
   async function submit() {
-    const st = $('fStatus'), go = $('fGo');
-    st.className = 'status'; st.textContent = '';
+    // The form can be drawn again while the wallet is asked (its features read again): the answer
+    // goes to the status line on the page then, never to the one drawn before (status-line.js).
     if (busy) return;
+    status.say('status', '');
     let params;
     try {
       const o = canonOrder();
@@ -586,24 +594,22 @@ export function mountPair(root, life) {
         if ($('optMinFill') && $('optMinFill').value) params.min_fill = minFillAtoms(amountAtoms($('optMinFill').value, prec(view.base)), inv, o.price, prec(canon.base)).toString();
         if ($('optTakeBack') && $('optTakeBack').value) params.take_back_after = Number($('optTakeBack').value);
       }
-    } catch (e) { st.className = 'status err'; st.textContent = e.message; return; }
-    if (!P.hasWallet()) { st.className = 'status err'; st.textContent = P.NO_WALLET; return; }
-    busy = true; go.disabled = true;
+    } catch (e) { status.say('status err', e.message); return; }
+    if (!P.hasWallet()) { status.say('status err', P.NO_WALLET); return; }
+    busy = true; $('fGo').disabled = true;
     try {
       if (!P.account()) await P.connect();
       if (!(await P.supports('placeOrder'))) throw new Error('this version of the wallet cannot trade here; update it from the downloads page');
-      st.textContent = 'Waiting for your approval in the wallet…';
+      status.say('status', 'Waiting for your approval in the wallet…');
       const r = await P.request('placeOrder', params);
-      st.className = 'status ok';
-      st.textContent = placedText(r);
+      status.say('status ok', placedText(r));
       $('fPay').value = ''; $('fReceive').value = '';
       closeSheet();
       refresh(); refreshBook();
     } catch (e) {
-      st.className = 'status err';
       const m = (e && e.message) || String(e);
-      st.textContent = /reject|declin|denied/i.test(m) ? 'You declined in the wallet. Nothing was traded.' : m;
-    } finally { busy = false; go.disabled = false; tether(); }
+      status.say('status err', /reject|declin|denied/i.test(m) ? 'You declined in the wallet. Nothing was traded.' : m);
+    } finally { busy = false; if ($('fGo')) $('fGo').disabled = false; tether(); }
   }
 
   // ---- the phone: the ticket opens as a sheet from Buy or Sell ----
